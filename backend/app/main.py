@@ -9,7 +9,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.database import engine
 from app.core.logging import get_logger, setup_logging
+from app.models import Base
 
 logger = get_logger(__name__)
 
@@ -18,6 +20,10 @@ logger = get_logger(__name__)
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     setup_logging()
     logger.info("Starting %s [%s]", settings.app_name, settings.app_env)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     yield
     logger.info("Shutting down %s", settings.app_name)
 
