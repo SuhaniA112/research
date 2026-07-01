@@ -16,7 +16,7 @@ import { getFindSourcesPath } from "@/lib/sourcePaths";
 
 const exploreLinks = [
   { to: "/hub", label: "Hub", icon: Home },
-  { to: "/projects", label: "All Projects", icon: FolderOpen },
+  { to: "/projects", label: "All Projects", icon: FolderOpen, end: true },
   { to: "/projects/new", label: "New Project", icon: Plus },
   { to: "/searches", label: "Recent Searches", icon: Search },
 ];
@@ -39,10 +39,11 @@ export function Sidebar() {
           <PanelLeft className="h-5 w-5" />
         </button>
         <nav className="flex flex-col items-center">
-          {exploreLinks.map(({ to, icon: Icon }) => (
+          {exploreLinks.map(({ to, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) =>
                 `mb-2 rounded-lg p-2 ${isActive ? "bg-gray-200 text-brand-700" : "text-gray-600 hover:bg-gray-200"}`
               }
@@ -80,10 +81,11 @@ export function Sidebar() {
           EXPLORE
         </p>
         <nav className="shrink-0 space-y-0.5">
-          {exploreLinks.map(({ to, label, icon: Icon }) => (
+          {exploreLinks.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
                   isActive

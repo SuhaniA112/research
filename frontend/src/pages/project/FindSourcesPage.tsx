@@ -55,7 +55,12 @@ export function FindSourcesPage() {
 
       <div className="mt-6 space-y-4">
         {visible.map((source) => (
-          <SourceCard key={source.id} source={source} projectId={projectId} />
+          <SourceCard
+            key={source.id}
+            source={source}
+            projectId={projectId}
+            sourceReferrer={{ type: "find-sources", projectId: projectId! }}
+          />
         ))}
       </div>
 

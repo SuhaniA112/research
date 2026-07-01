@@ -29,7 +29,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {project.topics.map((topic) => (
           <Tag key={topic}>{topic}</Tag>
         ))}
-        <Tag variant="green">{project.sourceCount} Sources</Tag>
+        <Tag variant="metrics">{project.sourceCount} Sources</Tag>
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 text-xs text-gray-500">
         <span>{project.sourceCount} Sources</span>

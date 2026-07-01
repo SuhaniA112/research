@@ -6,10 +6,16 @@ import { SelectionCard } from "@/components/ui/StatCard";
 import { Tag } from "@/components/ui/Tag";
 import { InputField } from "@/components/ui/InputField";
 import { allResearchAreas, currentUser } from "@/data/mockData";
+import { setOnboardingComplete } from "@/lib/onboarding";
 import type { ReadingLevel } from "@/types";
 
 export function OnboardingPage() {
   const navigate = useNavigate();
+
+  function finishOnboarding() {
+    setOnboardingComplete();
+    navigate("/hub");
+  }
   const [areas, setAreas] = useState<string[]>(currentUser.researchAreas);
   const [keywords, setKeywords] = useState<string[]>(currentUser.keywords);
   const [keywordInput, setKeywordInput] = useState("");
@@ -162,11 +168,18 @@ export function OnboardingPage() {
         </div>
       </section>
 
-      <div className="mt-10 flex justify-end">
+      <div className="mt-10 flex items-center justify-between">
         <button
           type="button"
-          onClick={() => navigate("/hub")}
-          className="text-sm font-medium text-brand-700 hover:underline"
+          onClick={finishOnboarding}
+          className="text-sm font-medium text-gray-500 hover:text-gray-700"
+        >
+          Skip for now
+        </button>
+        <button
+          type="button"
+          onClick={finishOnboarding}
+          className="rounded-lg bg-brand-700 px-5 py-2 text-sm font-medium text-white hover:bg-brand-800"
         >
           Continue →
         </button>

@@ -1,5 +1,6 @@
 import { Bookmark, Check, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   getIconSizeClass,
@@ -23,20 +24,53 @@ export function SaveToProjectButton({
   className = "",
 }: SaveToProjectButtonProps) {
   const [open, setOpen] = useState(false);
-  const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
+  const [savedProjectIds, setSavedProjectIds] = useState<Set<string>>(() => new Set());
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const iconClass = getIconSizeClass(size);
+  const hasSavedProjects = savedProjectIds.size > 0;
+
+  function updateMenuPosition() {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setMenuPosition({
+      top: rect.bottom + 4,
+      left: rect.right - 224,
+    });
+  }
+
+  function toggleProject(projectId: string) {
+    setSavedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        const target = e.target as HTMLElement;
+        if (!target.closest("[data-save-to-project-menu]")) {
+          setOpen(false);
+        }
       }
     }
     if (open) {
+      updateMenuPosition();
       document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("resize", updateMenuPosition);
+      window.addEventListener("scroll", updateMenuPosition, true);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
   }, [open]);
 
   return (
@@ -51,32 +85,39 @@ export function SaveToProjectButton({
         title="Save to project"
         aria-label="Save to project"
       >
-        <Bookmark className={`${iconClass} ${savedProjectId ? "fill-brand-700" : ""}`} />
+        <Bookmark className={`${iconClass} ${hasSavedProjects ? "fill-brand-700" : ""}`} />
       </IconButton>
-      {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-          <p className="px-3 py-2 text-xs font-semibold text-gray-500">Save to project</p>
-          {projects.map((project) => {
-            const isSaved = savedProjectId === project.id;
-            return (
-              <button
-                key={project.id}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSavedProjectId(project.id);
-                  setOpen(false);
-                }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <span className="truncate">{project.name}</span>
-                {isSaved && <Check className="h-4 w-4 shrink-0 text-metric-green" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            data-save-to-project-menu
+            className="fixed z-50 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
+            <p className="px-3 py-2 text-xs font-semibold text-gray-500">Save to project</p>
+            {projects.map((project) => {
+              const isSaved = savedProjectIds.has(project.id);
+              return (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleProject(project.id);
+                  }}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                    isSaved ? "text-gray-900" : "text-gray-700"
+                  }`}
+                >
+                  <span className="truncate">{project.name}</span>
+                  {isSaved && <Check className="h-4 w-4 shrink-0 text-metrics" />}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

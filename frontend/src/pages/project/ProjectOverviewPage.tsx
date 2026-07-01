@@ -9,6 +9,7 @@ import { ProjectStatCard } from "@/components/stats/ProjectStatCard";
 import { SourceBreakdownCard } from "@/components/stats/SourceBreakdownCard";
 import { getProject, recentProjectSearches, sourceRecency, sources } from "@/data/mockData";
 import { getFindSourcesPath } from "@/lib/sourcePaths";
+import { colors } from "@/lib/theme";
 
 export function ProjectOverviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -34,6 +35,7 @@ export function ProjectOverviewPage() {
                   key={source.id}
                   source={source}
                   projectId={projectId}
+                  sourceReferrer={{ type: "project-overview", projectId: projectId! }}
                   variant="standard"
                 />
               ))}
@@ -74,7 +76,7 @@ export function ProjectOverviewPage() {
             title="SOURCE RECENCY"
             subtitle={`${project.sourceCount} sources from 2020 onwards`}
             badge={
-              <span className="rounded-full bg-metric-green-light px-2 py-0.5 text-xs font-medium text-metric-green">
+              <span className="rounded-full bg-metrics-bg px-2 py-0.5 text-xs font-medium text-metrics">
                 18 since 2021
               </span>
             }
@@ -87,7 +89,7 @@ export function ProjectOverviewPage() {
                   {sourceRecency.map((entry) => (
                     <Cell
                       key={entry.year}
-                      fill={Number(entry.year) >= 2021 ? "#a21caf" : "#9ca3af"}
+                      fill={Number(entry.year) >= 2021 ? colors.brand.accent : colors.fg.muted}
                     />
                   ))}
                 </Bar>
@@ -103,12 +105,12 @@ export function ProjectOverviewPage() {
               <div className="relative h-20 w-40 overflow-hidden">
                 <div className="absolute inset-0 rounded-t-full border-8 border-gray-200" />
                 <div
-                  className="absolute inset-0 rounded-t-full border-8 border-metric-green"
+                  className="absolute inset-0 rounded-t-full border-8 border-metrics"
                   style={{ clipPath: "inset(0 0 50% 0)" }}
                 />
               </div>
               <p className="text-2xl font-bold">82 / 100</p>
-              <p className="text-xs font-semibold text-metric-green">HIGHLY CONNECTED</p>
+              <p className="text-xs font-semibold text-metrics">HIGHLY CONNECTED</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[

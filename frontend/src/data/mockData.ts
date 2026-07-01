@@ -1,4 +1,5 @@
 import type { MindMapEdge, MindMapNode, Project, Source, UserProfile } from "@/types";
+import { colors } from "@/lib/theme";
 
 export const currentUser: UserProfile = {
   name: "Alex",
@@ -269,9 +270,9 @@ export const mindMapEdges: MindMapEdge[] = [
 ];
 
 export const sourceBreakdown = [
-  { name: "Journals", value: 45, color: "#6b7280" },
-  { name: "Preprints", value: 35, color: "#9ca3af" },
-  { name: "Others", value: 20, color: "#d1d5db" },
+  { name: "Journals", value: 45, color: colors.fg.muted },
+  { name: "Preprints", value: 35, color: colors.fg.secondary },
+  { name: "Others", value: 20, color: colors.border },
 ];
 
 export const sourceRecency = [

@@ -16,13 +16,13 @@ export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPane
       <div className="space-y-5">
         <div>
           <p className="text-xs font-semibold tracking-wide text-gray-500">RELEVANCE</p>
-          <p className="mt-0.5 text-sm font-bold text-metric-green">{source.relevance}%</p>
+          <p className="mt-0.5 text-sm font-bold text-metrics">{source.relevance}%</p>
           <ProgressBar value={source.relevance} className="mt-1.5" />
           <p className="mt-2 text-[10px] font-semibold tracking-wide text-gray-500">RELEVANT TO:</p>
           <ul className="mt-1 space-y-0.5">
             {source.relevantTo.map((kw) => (
               <li key={kw} className="flex items-center gap-1.5 text-xs text-gray-700">
-                <Check className="h-3 w-3 shrink-0 text-metric-green" strokeWidth={3} />
+                <Check className="h-3 w-3 shrink-0 text-metrics" strokeWidth={3} />
                 {kw}
               </li>
             ))}
@@ -31,7 +31,7 @@ export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPane
 
         <div>
           <p className="text-xs font-semibold tracking-wide text-gray-500">SIMILARITY</p>
-          <p className="mt-0.5 text-sm font-bold text-metric-green">{source.similarity}%</p>
+          <p className="mt-0.5 text-sm font-bold text-metrics">{source.similarity}%</p>
           <ProgressBar value={source.similarity} className="mt-1.5" />
           <p className="mt-2 text-[10px] font-semibold tracking-wide text-gray-500">SIMILAR TO:</p>
           <ul className="mt-1 space-y-0.5">

@@ -1,6 +1,6 @@
 import { Pencil, Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 
 import { SourceListItem } from "@/components/cards/SourceListItem";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
@@ -10,10 +10,15 @@ import { SourceMetricsPanel } from "@/components/source/SourceMetricsPanel";
 import { PillButton } from "@/components/ui/PillButton";
 import { Tag } from "@/components/ui/Tag";
 import { getProject, getSource, sources, summaryTexts } from "@/data/mockData";
+import {
+  getDefaultSourceBreadcrumbs,
+  type SourceNavigationState,
+} from "@/lib/sourcePaths";
 import type { SummaryLevel } from "@/types";
 
 export function SourceDetailPage() {
   const { projectId, sourceId } = useParams<{ projectId: string; sourceId: string }>();
+  const location = useLocation();
   const project = getProject(projectId ?? "");
   const source = getSource(sourceId ?? "");
   const [summaryLevel, setSummaryLevel] = useState<SummaryLevel>("general");
@@ -22,19 +27,28 @@ export function SourceDetailPage() {
     return <p className="text-gray-500">Source not found.</p>;
   }
 
+  const navigationState = location.state as SourceNavigationState | null;
+  const parentBreadcrumbs =
+    navigationState?.breadcrumbs ?? getDefaultSourceBreadcrumbs(project.id);
+  const breadcrumbItems = [...parentBreadcrumbs, { label: source.title }];
+  const relatedSourceReferrer = {
+    type: "continue" as const,
+    projectId: project.id,
+    breadcrumbs: [
+      ...parentBreadcrumbs,
+      {
+        label: source.title,
+        to: `/projects/${project.id}/sources/${source.id}`,
+      },
+    ],
+  };
+
   const relatedPapers = sources.filter((s) => s.id !== source.id).slice(0, 3);
   const citedSources = sources.filter((s) => s.id !== source.id).slice(1, 4);
 
   return (
     <div>
-      <Breadcrumbs
-        items={[
-          { label: "All Projects", to: "/projects" },
-          { label: project.name, to: `/projects/${project.id}` },
-          { label: "Find Sources", to: `/projects/${project.id}/find-sources` },
-          { label: source.title },
-        ]}
-      />
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="mt-4 border-b border-gray-200 pb-6">
         <div className="flex items-start justify-between">
@@ -147,6 +161,7 @@ export function SourceDetailPage() {
                   relevance={s.relevance}
                   projectId={projectId}
                   sourceId={s.id}
+                  sourceReferrer={relatedSourceReferrer}
                 />
               ))}
             </div>
@@ -162,6 +177,7 @@ export function SourceDetailPage() {
                   title={s.title}
                   projectId={projectId}
                   sourceId={s.id}
+                  sourceReferrer={relatedSourceReferrer}
                 />
               ))}
             </div>

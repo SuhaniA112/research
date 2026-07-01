@@ -16,7 +16,7 @@ export function HubPage() {
         <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-500">
           TOP PICK THIS WEEK
         </h2>
-        <SourcePreviewCard source={topPick} variant="featured" />
+        <SourcePreviewCard source={topPick} sourceReferrer={{ type: "hub" }} variant="featured" />
       </section>
 
       <section className="mt-10">
@@ -25,7 +25,12 @@ export function HubPage() {
         </h2>
         <div className="grid grid-cols-2 gap-4">
           {digestSources.map((source) => (
-            <SourcePreviewCard key={source.id} source={source} variant="compact" />
+            <SourcePreviewCard
+              key={source.id}
+              source={source}
+              sourceReferrer={{ type: "hub" }}
+              variant="compact"
+            />
           ))}
         </div>
       </section>

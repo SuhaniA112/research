@@ -2,13 +2,13 @@ import { type ReactNode } from "react";
 
 interface TagProps {
   children: ReactNode;
-  variant?: "brand" | "green" | "outline";
+  variant?: "brand" | "metrics" | "outline";
   onRemove?: () => void;
 }
 
 const variantClasses = {
   brand: "bg-brand-100 text-brand-700",
-  green: "bg-metric-green-light text-metric-green",
+  metrics: "bg-metrics-bg text-metrics",
   outline: "border border-gray-300 bg-white text-gray-700",
 };
 

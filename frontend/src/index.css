@@ -1,8 +1,26 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Brand */
+  --brand-subtle: #fce7f3;
+  --brand-light: #fbcfe8;
+  --brand-accent: #c026d3;
+  --brand: #882d60;
+
+  /* Metrics */
+  --metrics: #16a34a;
+  --metrics-bg: #dcfce7;
+
+  /* UI */
+  --fg: #111827;
+  --fg-secondary: #374151;
+  --fg-muted: #6b7280;
+  --bg: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --border: #d1d5db;
+}
 
 @layer base {
   body {

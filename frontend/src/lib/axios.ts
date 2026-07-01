@@ -5,6 +5,7 @@ import axios, {
 } from "axios";
 
 import { env } from "@/config/env";
+import { clearOnboardingComplete } from "@/lib/onboarding";
 
 const TOKEN_STORAGE_KEY = "access_token";
 
@@ -13,11 +14,13 @@ export function getAccessToken(): string | null {
 }
 
 export function setAccessToken(token: string): void {
+  clearOnboardingComplete();
   localStorage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
 export function clearAccessToken(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
+  clearOnboardingComplete();
 }
 
 function attachAuthToken(

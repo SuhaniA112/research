@@ -1,5 +1,6 @@
 import { Plus, Search } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ProjectCard } from "@/components/cards/ProjectCard";
 import { PillButton } from "@/components/ui/PillButton";
@@ -44,13 +45,13 @@ export function AllProjectsPage() {
           />
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         </div>
-        <button
-          type="button"
+        <Link
+          to="/projects/new"
           className="flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         >
           <Plus className="h-4 w-4" />
           New Project
-        </button>
+        </Link>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-4">

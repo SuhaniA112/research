@@ -1,5 +1,5 @@
 import { SourceActions } from "@/components/source/SourceActions";
-import { getSourcePagePath } from "@/lib/sourcePaths";
+import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
 import { Link } from "react-router-dom";
 
 interface SourceListItemProps {
@@ -7,16 +7,27 @@ interface SourceListItemProps {
   relevance?: number;
   projectId?: string;
   sourceId?: string;
+  sourceReferrer?: SourceReferrer;
 }
 
-export function SourceListItem({ title, relevance, projectId, sourceId }: SourceListItemProps) {
-  const canNavigate = Boolean(sourceId && projectId);
+export function SourceListItem({
+  title,
+  relevance,
+  projectId,
+  sourceId,
+  sourceReferrer,
+}: SourceListItemProps) {
+  const canNavigate = Boolean(sourceId && projectId && sourceReferrer);
+  const sourceLink =
+    canNavigate && sourceReferrer
+      ? getSourcePageLink(sourceId!, sourceReferrer)
+      : null;
 
   return (
     <div className="relative flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50">
-      {canNavigate && (
+      {sourceLink && (
         <Link
-          to={getSourcePagePath(sourceId!, projectId)}
+          to={sourceLink}
           className="absolute inset-0 rounded-lg"
           aria-label={`View ${title}`}
         />

@@ -9,23 +9,31 @@ import {
 } from "@/components/ui/IconButton";
 import { StarButton } from "@/components/ui/StarButton";
 import { Tag } from "@/components/ui/Tag";
-import { getSourcePagePath } from "@/lib/sourcePaths";
+import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
 import { useStarred } from "@/providers/StarredProvider";
 import type { Source } from "@/types";
 
 interface SavedSourceCardProps {
   source: Source;
   projectId: string;
+  sourceReferrer?: SourceReferrer;
 }
 
-export function SavedSourceCard({ source, projectId }: SavedSourceCardProps) {
+export function SavedSourceCard({
+  source,
+  projectId,
+  sourceReferrer,
+}: SavedSourceCardProps) {
   const { isSourceStarred, toggleSourceStar } = useStarred();
   const starred = isSourceStarred(source.id);
-  const sourcePath = getSourcePagePath(source.id, projectId);
+  const sourceLink = getSourcePageLink(
+    source.id,
+    sourceReferrer ?? { type: "saved-sources", projectId },
+  );
 
   return (
     <div className="relative rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md">
-      <Link to={sourcePath} className="absolute inset-0 rounded-xl" aria-label={`View ${source.title}`} />
+      <Link to={sourceLink} className="absolute inset-0 rounded-xl" aria-label={`View ${source.title}`} />
 
       <div className="relative z-0 p-5 pb-0">
         <div className="flex items-start justify-between gap-2">
