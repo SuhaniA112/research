@@ -1,0 +1,3 @@
+# Use pgvector instead of a dedicated vector database
+
+We need to store and query paper Chunk embeddings for retrieval. We considered a dedicated vector database (Chroma, Qdrant, Weaviate) versus the `pgvector` extension on the existing Postgres instance. We chose `pgvector`: the app already runs a single Postgres instance for paper and user data, and at this app's scale (one user's research interests, not billions of vectors) a second stateful service buys scaling headroom we don't need at the cost of operating two databases and a dual-write consistency problem between a paper row and its vector. If retrieval scale outgrows `pgvector`, migrating is a re-embed into a dedicated store, not a schema rewrite, since embeddings are already isolated on the Chunk concept.
