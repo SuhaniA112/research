@@ -8,17 +8,34 @@ from app.models.chunk import Chunk
 from app.models.paper import Paper
 from app.models.project_paper import ProjectPaper
 from app.repositories.base import BaseRepository
+from app.schemas.indexing import PreparedChunk
 
 
 class ChunkRepository(BaseRepository[Chunk]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Chunk)
 
-    async def create_for_paper(
-        self, paper_id: UUID, text: str, embedding: list[float]
-    ) -> Chunk:
-        chunk = Chunk(paper_id=paper_id, chunk_index=0, text=text, embedding=embedding)
-        return await self.create(chunk)
+    async def create_many_for_paper(
+        self,
+        paper_id: UUID,
+        chunks: list[PreparedChunk],
+        embeddings: list[list[float]],
+    ) -> list[Chunk]:
+        if not chunks:
+            return []
+
+        rows = [
+            Chunk(
+                paper_id=paper_id,
+                chunk_index=chunk.chunk_index,
+                text=chunk.chunk_text,
+                embedding=embedding,
+            )
+            for chunk, embedding in zip(chunks, embeddings, strict=True)
+        ]
+        self.session.add_all(rows)
+        await self.session.flush()
+        return rows
 
     async def search_by_project(
         self,

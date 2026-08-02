@@ -10,6 +10,7 @@ from app.repositories.project_repo import ProjectRepository
 from app.schemas.paper import PaperResponse, SavePaperResponse
 from app.schemas.research_papers import IndPaper
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
+from app.services.indexing.paper_indexer import PaperIndexer
 
 
 class IngestionService:
@@ -20,12 +21,14 @@ class IngestionService:
         project_paper_repo: ProjectPaperRepository,
         project_repo: ProjectRepository,
         voyage_client: VoyageEmbeddingClient,
+        paper_indexer: PaperIndexer,
     ) -> None:
         self.paper_repo = paper_repo
         self.chunk_repo = chunk_repo
         self.project_paper_repo = project_paper_repo
         self.project_repo = project_repo
         self.voyage_client = voyage_client
+        self.paper_indexer = paper_indexer
 
     async def save_paper_to_project(
         self, project_id: UUID, paper_in: IndPaper
@@ -63,14 +66,18 @@ class IngestionService:
                     topics=paper_in.topics,
                 )
             )
-            # Indexable Text: abstract when available, falling back to title so a paper
-            # is never unembeddable just because its Source Provider has no abstract
-            # (e.g. DBLP always returns abstract=None).
-            indexable_text = paper_in.abstract if paper_in.abstract else paper_in.title
-            [embedding] = await self.voyage_client.embed(
-                [indexable_text], input_type="document"
+
+            prepared_chunks = await self.paper_indexer.prepare_chunks(
+                str(paper.id), paper_in
             )
-            await self.chunk_repo.create_for_paper(paper.id, indexable_text, embedding)
+            if prepared_chunks:
+                embeddings = await self.voyage_client.embed(
+                    [chunk.embedding_text for chunk in prepared_chunks],
+                    input_type="document",
+                )
+                await self.chunk_repo.create_many_for_paper(
+                    paper.id, prepared_chunks, embeddings
+                )
 
         _, created = await self.project_paper_repo.create_if_absent(project_id, paper.id)
 

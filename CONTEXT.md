@@ -13,11 +13,11 @@ The process of pulling paper results from a Source Provider and persisting them 
 _Avoid_: scraping, crawling
 
 **Indexable Text**:
-The text of a paper that gets embedded into the vector store. In v1, this is title + abstract only. Full paper text (from PDF) is a deferred, later extension of this concept — the schema and indexer must not assume abstract-only is permanent.
+The text of a paper that gets embedded into the vector store. Sourced by the PaperIndexer in priority order: full PDF text (when `pdf_url` is present and extraction succeeds), else the abstract, else the title. A paper is never unembeddable — the title fallback guarantees at least one Chunk even when a Source Provider has no abstract (e.g. DBLP always returns `abstract=None`).
 _Avoid_: document text, content
 
 **Chunk**:
-A unit of Indexable Text that gets embedded as a single vector. A paper has one or more chunks. In v1 every paper has exactly one chunk (its abstract); multi-chunk splitting is deferred until full-text papers exist.
+A unit of Indexable Text that gets embedded as a single vector. A paper has one or more Chunks. When full PDF text is available it is split into many page-aware Chunks by the PaperChunker; abstract- or title-sourced text is typically a single Chunk.
 _Avoid_: segment, passage
 
 **Discovery**:

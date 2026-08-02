@@ -15,6 +15,7 @@ from app.services.ask_service import AskService
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
 from app.services.generation.openrouter_client import OpenRouterClient
 from app.services.ingestion_service import IngestionService
+from app.services.indexing.paper_indexer import PaperIndexer
 from app.services.project_service import ProjectService
 from app.services.research_service import ResearchService
 from app.services.user_service import UserService
@@ -87,15 +88,23 @@ def get_project_service(project_repo: ProjectRepoDep) -> ProjectService:
     return ProjectService(project_repo)
 
 
+def get_paper_indexer() -> PaperIndexer:
+    return PaperIndexer()
+
+
+PaperIndexerDep = Annotated[PaperIndexer, Depends(get_paper_indexer)]
+
+
 def get_ingestion_service(
     paper_repo: PaperRepoDep,
     chunk_repo: ChunkRepoDep,
     project_paper_repo: ProjectPaperRepoDep,
     project_repo: ProjectRepoDep,
     voyage_client: VoyageClientDep,
+    paper_indexer: PaperIndexerDep,
 ) -> IngestionService:
     return IngestionService(
-        paper_repo, chunk_repo, project_paper_repo, project_repo, voyage_client
+        paper_repo, chunk_repo, project_paper_repo, project_repo, voyage_client, paper_indexer
     )
 
 

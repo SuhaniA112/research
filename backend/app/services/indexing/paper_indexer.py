@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from app.schemas.indexing import PreparedChunk
 from app.schemas.research_papers import IndPaper
-from app.services.indexing.chunker import PaperChunker
-from app.services.indexing.chunker import PaperChunker
+from app.services.indexing.chunker import PaperChunker, TextChunk
 from app.services.indexing.pdf_extractor import PdfTextExtractor
 
 
@@ -85,7 +84,7 @@ class PaperIndexer:
             )
 
         return prepared_chunks
-    
+
     async def _get_paper_chunks(
         self,
         paper: IndPaper,
@@ -115,7 +114,13 @@ class PaperIndexer:
                 "abstract",
             )
 
-        return [], "unavailable"
+        # Indexable Text guarantee: a paper is never unembeddable just because its
+        # Source Provider has no abstract and no PDF (e.g. DBLP always returns
+        # abstract=None) - fall back to the title, which IndPaper always requires.
+        return (
+            self.chunker.split(paper.title),
+            "title",
+        )
 
     @staticmethod
     def _build_embedding_text(
