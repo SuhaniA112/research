@@ -11,6 +11,8 @@ dependencies = [
     "asyncpg>=0.30.0",
     "python-multipart>=0.0.12",
     "email-validator>=2.2.0",
+    "langchain-text-splitters",
+    "pgvector>=0.3.6",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,7 @@
+# PaperIndexer drives Ingestion's chunking, not IngestionService directly
+
+`indexer` and `feature/save-to-project-rag` were built in parallel and each solved chunking independently: `indexer` produced a full-text-aware, multi-chunk `PaperIndexer` (PDF extraction + page-aware splitting) with no persistence, while `save-to-project-rag` shipped a working `IngestionService` that only ever embedded the abstract (or title) as a single hardcoded `chunk_index=0` row. We integrated by making `IngestionService.save_paper_to_project` call `PaperIndexer.prepare_chunks()` and bulk-persist whatever it returns via a new `ChunkRepository.create_many_for_paper`, rather than keeping `PaperIndexer` as unwired dead code alongside the simpler path.
+
+We deliberately moved the "a paper is never unembeddable" title-fallback guarantee into `PaperIndexer._get_paper_chunks` (chunk the title when there's no PDF and no abstract) instead of keeping it in `IngestionService`, so any future caller of `prepare_chunks()` gets the same guarantee for free.
+
+We chose not to persist `PreparedChunk`'s per-chunk metadata (`page_number`, `content_type`, `chunk_id`, denormalized paper fields) onto the `Chunk` model. Retrieval already joins `Chunk` to `Paper` for paper-level fields, and nothing yet consumes page-level citations — adding those columns is a cheap follow-up later since there's no Alembic migration cost (schema is `create_all`).
