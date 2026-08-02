@@ -20,7 +20,9 @@ class ProjectService:
             )
         return ProjectResponse.model_validate(project)
 
-    async def list_projects(self, *, skip: int = 0, limit: int = 100) -> list[ProjectResponse]:
+    async def list_projects(
+        self, *, skip: int = 0, limit: int = 100
+    ) -> list[ProjectResponse]:
         projects = await self.project_repo.list_all(skip=skip, limit=limit)
         return [ProjectResponse.model_validate(project) for project in projects]
 

@@ -2,7 +2,6 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.models.paper import Paper
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.paper_repo import PaperRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
@@ -43,26 +42,9 @@ class IngestionService:
                 detail="Paper is missing a stable external_id and cannot be saved",
             )
 
-        existing_paper = await self.paper_repo.get_by_source_and_external_id(
-            paper_in.source, paper_in.external_id
-        )
+        paper, created = await self.paper_repo.upsert_from_ind_paper(paper_in)
 
-        if existing_paper is not None:
-            paper = existing_paper
-        else:
-            paper = await self.paper_repo.create(
-                Paper(
-                    source=paper_in.source,
-                    external_id=paper_in.external_id,
-                    title=paper_in.title,
-                    abstract=paper_in.abstract,
-                    authors=paper_in.authors,
-                    year=paper_in.year,
-                    url=paper_in.url,
-                    pdf_url=paper_in.pdf_url,
-                    topics=paper_in.topics,
-                )
-            )
+        if created:
             # Indexable Text: abstract when available, falling back to title so a paper
             # is never unembeddable just because its Source Provider has no abstract
             # (e.g. DBLP always returns abstract=None).
@@ -70,13 +52,28 @@ class IngestionService:
             [embedding] = await self.voyage_client.embed(
                 [indexable_text], input_type="document"
             )
-            await self.chunk_repo.create_for_paper(paper.id, indexable_text, embedding)
+            await self.chunk_repo.ensure_chunk_for_paper(
+                paper.id, indexable_text, embedding
+            )
+        else:
+            # Reuse existing paper — only embed if it somehow lacks a chunk.
+            existing_chunk = await self.chunk_repo.get_for_paper(paper.id)
+            if existing_chunk is None:
+                indexable_text = paper.abstract if paper.abstract else paper.title
+                [embedding] = await self.voyage_client.embed(
+                    [indexable_text], input_type="document"
+                )
+                await self.chunk_repo.ensure_chunk_for_paper(
+                    paper.id, indexable_text, embedding
+                )
 
-        _, created = await self.project_paper_repo.create_if_absent(project_id, paper.id)
+        _, link_created = await self.project_paper_repo.create_if_absent(
+            project_id, paper.id
+        )
 
         return SavePaperResponse(
             paper=PaperResponse.model_validate(paper),
-            already_saved=not created,
+            already_saved=not link_created,
         )
 
     async def unsave_paper_from_project(self, project_id: UUID, paper_id: UUID) -> bool:

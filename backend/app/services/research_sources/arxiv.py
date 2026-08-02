@@ -4,6 +4,7 @@ import httpx
 from app.schemas.research_papers import IndPaper
 from app.services.research_sources.base import ResearchSourceClient
 
+
 class ArxivClient(ResearchSourceClient):
     BASE_URL = "https://export.arxiv.org/api/query"
 

@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
 
 class IndPaper(BaseModel):
     title: str
@@ -10,6 +11,7 @@ class IndPaper(BaseModel):
     source: str
     external_id: str | None = None
     topics: list[str] = []
+
 
 class SearchResponse(BaseModel):
     interests: list[str]

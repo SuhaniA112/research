@@ -11,8 +11,9 @@ from app.models.base import Base
 class ProjectPaper(Base):
     """Represents a Save: the user action of attaching a Paper to a Project.
 
-    No TimestampMixin — a save is a point-in-time fact, not a mutable row. The composite
-    primary key is both the row's identity and the natural guard against duplicate saves.
+    No TimestampMixin — a save is a point-in-time fact, not a mutable row.
+    The composite primary key is both the row's identity and the natural
+    guard against duplicate saves.
     """
 
     __tablename__ = "project_papers"

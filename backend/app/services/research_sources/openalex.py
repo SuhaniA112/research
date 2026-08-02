@@ -3,6 +3,7 @@ import httpx
 from app.schemas.research_papers import IndPaper
 from app.services.research_sources.base import ResearchSourceClient
 
+
 class OpenAlexClient(ResearchSourceClient):
     BASE_URL = "https://api.openalex.org/works"
 
@@ -60,6 +61,5 @@ class OpenAlexClient(ResearchSourceClient):
                 words_by_position[position] = word
 
         return " ".join(
-            words_by_position[position]
-            for position in sorted(words_by_position)
+            words_by_position[position] for position in sorted(words_by_position)
         )

@@ -22,11 +22,6 @@ class UserRepository(BaseRepository[User]):
         return result.scalar_one_or_none()
 
     async def list_active(self, *, skip: int = 0, limit: int = 100) -> list[User]:
-        stmt = (
-            select(User)
-            .where(User.deleted_at.is_(None))
-            .offset(skip)
-            .limit(limit)
-        )
+        stmt = select(User).where(User.deleted_at.is_(None)).offset(skip).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
