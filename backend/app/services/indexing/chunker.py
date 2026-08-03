@@ -27,9 +27,7 @@ class PaperChunker:
             raise ValueError("chunk_overlap cannot be negative")
 
         if chunk_overlap >= chunk_size:
-            raise ValueError(
-                "chunk_overlap must be smaller than chunk_size"
-            )
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
 
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
@@ -80,9 +78,7 @@ class PaperChunker:
             if not cleaned_page_text:
                 continue
 
-            page_chunk_texts = self._splitter.split_text(
-                cleaned_page_text
-            )
+            page_chunk_texts = self._splitter.split_text(cleaned_page_text)
 
             for page_chunk_text in page_chunk_texts:
                 page_chunk_text = page_chunk_text.strip()

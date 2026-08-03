@@ -14,7 +14,12 @@ from uuid import UUID
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from eval._wiring import build_ask_service, build_paper_repo, build_chunk_repo, build_voyage_client
+from eval._wiring import (
+    build_ask_service,
+    build_paper_repo,
+    build_chunk_repo,
+    build_voyage_client,
+)
 
 GOLDEN_SET_PATH = Path(__file__).parent / "golden_set.json"
 
@@ -34,10 +39,14 @@ async def score_retrieval_hit(project_id: UUID, item: dict) -> bool:
             item["source"], item["external_id"]
         )
         if expected_paper is None:
-            print(f"  [{item['id']}] WARNING: paper {item['source']}/{item['external_id']} not found in DB")
+            print(
+                f"  [{item['id']}] WARNING: paper {item['source']}/{item['external_id']} not found in DB"
+            )
             return False
 
-        [query_embedding] = await voyage_client.embed([item["question"]], input_type="query")
+        [query_embedding] = await voyage_client.embed(
+            [item["question"]], input_type="query"
+        )
         results = await chunk_repo.search_by_project(
             project_id,
             query_embedding,
@@ -86,18 +95,26 @@ async def main() -> None:
     data = load_golden_set()
     items = data["items"]
     if not items:
-        print(f"No golden set items found in {GOLDEN_SET_PATH}. Run generate_golden_set.py first.")
+        print(
+            f"No golden set items found in {GOLDEN_SET_PATH}. Run generate_golden_set.py first."
+        )
         return
 
-    project_id = args.project_id or (UUID(data["project_id"]) if data["project_id"] else None)
+    project_id = args.project_id or (
+        UUID(data["project_id"]) if data["project_id"] else None
+    )
     if project_id is None:
         print("No --project-id given and none stored in golden_set.json.")
         return
 
     unreviewed = [i["id"] for i in items if not i.get("reviewed")]
     if unreviewed:
-        print(f"WARNING: {len(unreviewed)} unreviewed item(s) in golden set: {unreviewed}")
-        print("These are synthetic and not yet hand-verified — treat these numbers as provisional.\n")
+        print(
+            f"WARNING: {len(unreviewed)} unreviewed item(s) in golden set: {unreviewed}"
+        )
+        print(
+            "These are synthetic and not yet hand-verified — treat these numbers as provisional.\n"
+        )
 
     hits = 0
     citation_valid = 0
@@ -119,8 +136,10 @@ async def main() -> None:
             flag_reasons.append("citation_outside_retrieved_set")
 
         status_str = "HIT" if hit else "MISS"
-        print(f"[{item['id']}] retrieval={status_str} generation={gen['status']}"
-              + (f" FLAGGED({', '.join(flag_reasons)})" if flag_reasons else ""))
+        print(
+            f"[{item['id']}] retrieval={status_str} generation={gen['status']}"
+            + (f" FLAGGED({', '.join(flag_reasons)})" if flag_reasons else "")
+        )
         if flag_reasons:
             flagged.append(item["id"])
 

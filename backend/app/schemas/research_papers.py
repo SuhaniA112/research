@@ -12,6 +12,7 @@ class IndPaper(BaseModel):
     external_id: str | None = None
     topics: list[str] = Field(default_factory=list)
 
+
 class SearchResponse(BaseModel):
     interests: list[str]
     total_results: int

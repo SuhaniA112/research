@@ -47,7 +47,9 @@ class AskService:
                 detail=f"Project {project_id} not found",
             )
 
-        [query_embedding] = await self.voyage_client.embed([question], input_type="query")
+        [query_embedding] = await self.voyage_client.embed(
+            [question], input_type="query"
+        )
         results = await self.chunk_repo.search_by_project(
             project_id,
             query_embedding,
@@ -58,7 +60,9 @@ class AskService:
         retrieved_chunk_ids = [chunk.id for chunk, _ in results]
 
         if not results:
-            response = AskResponse(status="no_relevant_sources", answer=None, citations=[])
+            response = AskResponse(
+                status="no_relevant_sources", answer=None, citations=[]
+            )
             return (response, retrieved_chunk_ids) if debug else response
 
         messages = self._build_prompt(question, results)
@@ -66,7 +70,9 @@ class AskService:
         answer_text, cited_chunk_ids = self._parse_citations(raw_answer)
         citations = self._resolve_citations(cited_chunk_ids, results)
 
-        response = AskResponse(status="answered", answer=answer_text, citations=citations)
+        response = AskResponse(
+            status="answered", answer=answer_text, citations=citations
+        )
         return (response, retrieved_chunk_ids) if debug else response
 
     def _build_prompt(
@@ -78,9 +84,11 @@ class AskService:
         )
         system = (
             "You answer questions using only the numbered sources provided. "
-            "Do not use outside knowledge. If the sources don't answer the question, say so. "
-            "After your answer, on its own line, list the chunk_id of every source you "
-            "actually used in this exact format: CITATIONS: [<chunk_id>, <chunk_id>, ...]"
+            "Do not use outside knowledge. If the sources don't answer the "
+            "question, say so. "
+            "After your answer, on its own line, list the chunk_id of every "
+            "source you actually used in this exact format: "
+            "CITATIONS: [<chunk_id>, <chunk_id>, ...]"
         )
         user = f"Sources:\n\n{numbered_sources}\n\nQuestion: {question}"
         return [
@@ -103,7 +111,9 @@ class AskService:
                 continue
 
         if not cited_ids:
-            logger.warning("OpenRouter response had an empty/unparseable CITATIONS block")
+            logger.warning(
+                "OpenRouter response had an empty/unparseable CITATIONS block"
+            )
 
         return answer_text, cited_ids
 
@@ -116,7 +126,7 @@ class AskService:
         for chunk_id in cited_chunk_ids:
             found = by_id.get(chunk_id)
             if found is None:
-                # Model cited a chunk_id outside the retrieved set — ignore rather than error.
+                # Model cited a chunk_id outside the retrieved set — ignore.
                 continue
             chunk, distance = found
             citations.append(

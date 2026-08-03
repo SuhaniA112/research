@@ -58,9 +58,7 @@ class PdfTextExtractor:
                 )
 
             if not pages:
-                raise ValueError(
-                    "The PDF contained no extractable text"
-                )
+                raise ValueError("The PDF contained no extractable text")
 
             return pages
 
@@ -81,9 +79,7 @@ class PdfTextExtractor:
             raise ValueError("Downloaded PDF was empty")
 
         if len(pdf_bytes) > self._max_pdf_size_bytes:
-            raise ValueError(
-                "Downloaded PDF exceeds the configured size limit"
-            )
+            raise ValueError("Downloaded PDF exceeds the configured size limit")
 
         content_type = response.headers.get(
             "content-type",
@@ -97,8 +93,7 @@ class PdfTextExtractor:
 
         if not is_pdf_content_type and not has_pdf_signature:
             raise ValueError(
-                f"URL did not return a PDF. "
-                f"Content-Type was {content_type!r}"
+                f"URL did not return a PDF. " f"Content-Type was {content_type!r}"
             )
 
         return pdf_bytes

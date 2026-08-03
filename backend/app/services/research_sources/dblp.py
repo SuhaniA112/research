@@ -3,6 +3,7 @@ import httpx
 from app.schemas.research_papers import IndPaper
 from app.services.research_sources.base import ResearchSourceClient
 
+
 class DblpClient(ResearchSourceClient):
     BASE_URL = "https://dblp.org/search/publ/api"
 
@@ -58,10 +59,6 @@ class DblpClient(ResearchSourceClient):
             return [name] if name else []
 
         if isinstance(authors_data, list):
-            return [
-                author.get("text")
-                for author in authors_data
-                if author.get("text")
-            ]
+            return [author.get("text") for author in authors_data if author.get("text")]
 
         return []
