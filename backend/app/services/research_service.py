@@ -6,7 +6,6 @@ from app.services.research_sources.dblp import DblpClient
 from app.services.research_sources.openalex import OpenAlexClient
 from app.services.research_sources.semanticscholar import SemanticScholarClient
 
-
 # temporarily hardcoded, till we change it to be from user profile
 HARDCODED_INTERESTS = [
     "artificial intelligence in healthcare",
@@ -37,7 +36,7 @@ class ResearchService:
                         f"Error fetching from {client.__class__.__name__} "
                         f"for query '{interest}': {error}"
                     )
-                # lowk just using this for semantic scholar, might be good to get rid of that source
+                # rate-limit Semantic Scholar; may remove this sleep later
                 await asyncio.sleep(1)
 
         deduped_results = self._dedupe_results(all_results)

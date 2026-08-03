@@ -26,7 +26,9 @@ class UserService:
             )
         return UserResponse.model_validate(user)
 
-    async def list_users(self, *, skip: int = 0, limit: int = 100) -> list[UserResponse]:
+    async def list_users(
+        self, *, skip: int = 0, limit: int = 100
+    ) -> list[UserResponse]:
         users = await self.user_repo.list_active(skip=skip, limit=limit)
         return [UserResponse.model_validate(user) for user in users]
 

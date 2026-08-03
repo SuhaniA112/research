@@ -19,9 +19,7 @@ class PaperIndexer:
             chunk_overlap=250,
         )
 
-        self.pdf_extractor = (
-            pdf_extractor or PdfTextExtractor()
-        )
+        self.pdf_extractor = pdf_extractor or PdfTextExtractor()
 
     async def prepare_chunks(
         self,
@@ -31,26 +29,18 @@ class PaperIndexer:
         if not paper_id.strip():
             raise ValueError("paper_id cannot be empty")
 
-        text_chunks, content_type = (
-            await self._get_paper_chunks(paper)
-        )
+        text_chunks, content_type = await self._get_paper_chunks(paper)
 
         if not text_chunks:
             return []
 
-        topics = [
-            topic.strip()
-            for topic in paper.topics
-            if topic.strip()
-        ]
+        topics = [topic.strip() for topic in paper.topics if topic.strip()]
 
         prepared_chunks: list[PreparedChunk] = []
 
         for chunk in text_chunks:
             chunk_id = (
-                f"{paper_id}:"
-                f"{self.INDEXER_VERSION}:"
-                f"{chunk.chunk_index:05d}"
+                f"{paper_id}:" f"{self.INDEXER_VERSION}:" f"{chunk.chunk_index:05d}"
             )
 
             embedding_text = self._build_embedding_text(
@@ -91,9 +81,7 @@ class PaperIndexer:
     ) -> tuple[list[TextChunk], str]:
         if paper.pdf_url:
             try:
-                pages = await self.pdf_extractor.extract(
-                    paper.pdf_url
-                )
+                pages = await self.pdf_extractor.extract(paper.pdf_url)
 
                 return (
                     self.chunker.split_pages(pages),
@@ -103,10 +91,7 @@ class PaperIndexer:
             except Exception as error:
                 # For development, print this clearly.
                 # Later, replace this with your project logger.
-                print(
-                    f"Full PDF extraction failed for "
-                    f"{paper.title!r}: {error}"
-                )
+                print(f"Full PDF extraction failed for " f"{paper.title!r}: {error}")
 
         if paper.abstract:
             return (
@@ -134,17 +119,11 @@ class PaperIndexer:
         ]
 
         if topics:
-            sections.append(
-                f"Topics: {', '.join(topics)}"
-            )
+            sections.append(f"Topics: {', '.join(topics)}")
 
         if page_number is not None:
-            sections.append(
-                f"Page: {page_number}"
-            )
+            sections.append(f"Page: {page_number}")
 
-        sections.append(
-            f"Content:\n{chunk_text}"
-        )
+        sections.append(f"Content:\n{chunk_text}")
 
         return "\n\n".join(sections)

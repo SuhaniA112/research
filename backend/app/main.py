@@ -9,9 +9,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import ensure_database_exists, ensure_pgvector_extension, engine
+from app.core.database import ensure_database_exists, ensure_pgvector_extension
 from app.core.logging import get_logger, setup_logging
-from app.models import Base
 
 logger = get_logger(__name__)
 
@@ -24,8 +23,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await ensure_database_exists()
     await ensure_pgvector_extension()
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema changes are applied only via Alembic (`alembic upgrade head`).
+    # Startup never calls Base.metadata.create_all — that would hide missing
+    # migrations in development and is unsafe as a production migration path.
+    logger.info(
+        "Schema managed by Alembic; ensure migrations are applied "
+        "(alembic upgrade head)"
+    )
 
     yield
     logger.info("Shutting down %s", settings.app_name)
@@ -62,9 +66,17 @@ async def validation_exception_handler(
     _: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    # Pydantic may put raw exception objects in error ctx; coerce for JSON.
+    detail = []
+    for error in exc.errors():
+        item = dict(error)
+        ctx = item.get("ctx")
+        if isinstance(ctx, dict):
+            item["ctx"] = {key: str(value) for key, value in ctx.items()}
+        detail.append(item)
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={"detail": detail},
     )
 
 

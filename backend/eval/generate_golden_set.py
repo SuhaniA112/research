@@ -58,7 +58,12 @@ def load_golden_set() -> dict:
     if GOLDEN_SET_PATH.exists():
         with GOLDEN_SET_PATH.open() as f:
             return json.load(f)
-    return {"generated_at": None, "generator_model": None, "project_id": None, "items": []}
+    return {
+        "generated_at": None,
+        "generator_model": None,
+        "project_id": None,
+        "items": [],
+    }
 
 
 def save_golden_set(data: dict) -> None:
@@ -116,7 +121,9 @@ async def main() -> None:
     data["project_id"] = str(args.project_id)
     save_golden_set(data)
     print(f"\nWrote {len(data['items'])} total item(s) to {GOLDEN_SET_PATH}")
-    print("Hand-review the generated questions and flip reviewed: true before trusting run_eval.py.")
+    print(
+        "Hand-review the generated questions and flip reviewed: true before trusting run_eval.py."
+    )
 
 
 if __name__ == "__main__":

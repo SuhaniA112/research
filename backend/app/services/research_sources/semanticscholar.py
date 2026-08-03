@@ -3,6 +3,7 @@ import httpx
 from app.schemas.research_papers import IndPaper
 from app.services.research_sources.base import ResearchSourceClient
 
+
 class SemanticScholarClient(ResearchSourceClient):
     BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 

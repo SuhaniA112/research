@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.project_paper import ProjectPaper
@@ -23,10 +24,26 @@ class ProjectPaperRepository:
         if existing is not None:
             return existing, False
 
-        row = ProjectPaper(project_id=project_id, paper_id=paper_id)
-        self.session.add(row)
-        await self.session.flush()
-        return row, True
+        stmt = (
+            insert(ProjectPaper)
+            .values(project_id=project_id, paper_id=paper_id)
+            .on_conflict_do_nothing()
+            .returning(ProjectPaper.project_id, ProjectPaper.paper_id)
+        )
+        result = await self.session.execute(stmt)
+        row = result.first()
+        if row is not None:
+            created = await self.get(project_id, paper_id)
+            assert created is not None
+            return created, True
+
+        existing = await self.get(project_id, paper_id)
+        if existing is None:
+            raise RuntimeError(
+                f"ProjectPaper upsert race unresolved for "
+                f"project={project_id} paper={paper_id}"
+            )
+        return existing, False
 
     async def delete_if_present(self, project_id: UUID, paper_id: UUID) -> bool:
         existing = await self.get(project_id, paper_id)

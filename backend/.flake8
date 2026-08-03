@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203, W503
+# Forward-referenced ORM relationship types use quoted / postponed annotations.
+per-file-ignores =
+    app/models/*: F821
