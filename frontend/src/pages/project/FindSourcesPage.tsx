@@ -1,22 +1,69 @@
 import { Filter, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import { getProject } from "@/api/projects";
+import { recordSearch, searchSources, useInvalidateSearchHistory } from "@/api/research";
 import { SourceCard } from "@/components/cards/SourceCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { getProject, sources } from "@/data/mockData";
+import type { Project, Source } from "@/types";
 
 export function FindSourcesPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams] = useSearchParams();
-  const project = getProject(projectId ?? "");
+  const invalidateSearchHistory = useInvalidateSearchHistory();
+  const [project, setProject] = useState<Project | null | undefined>(undefined);
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [results, setResults] = useState<Source[]>([]);
   const [visibleCount, setVisibleCount] = useState(3);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = sources.filter(
-    (s) => !search || s.title.toLowerCase().includes(search.toLowerCase()),
-  );
-  const visible = filtered.slice(0, visibleCount);
+  useEffect(() => {
+    if (!projectId) {
+      setProject(null);
+      return;
+    }
+    void getProject(projectId).then((p) => setProject(p ?? null));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      void searchSources(search)
+        .then((sources) => {
+          if (cancelled) return;
+          setResults(sources);
+          setVisibleCount(3);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setResults([]);
+          setError(err instanceof Error ? err.message : "Search failed");
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      if (search.trim()) {
+        void recordSearch(projectId, search).then(() => {
+          if (!cancelled) invalidateSearchHistory();
+        });
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [projectId, search, invalidateSearchHistory]);
+
+  const visible = results.slice(0, visibleCount);
+
+  if (project === undefined) {
+    return <p className="text-sm text-gray-500">Loading…</p>;
+  }
 
   if (!project) {
     return <p className="text-gray-500">Project not found.</p>;
@@ -54,17 +101,31 @@ export function FindSourcesPage() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {visible.map((source) => (
-          <SourceCard
-            key={source.id}
-            source={source}
-            projectId={projectId}
-            sourceReferrer={{ type: "find-sources", projectId: projectId! }}
-          />
-        ))}
+        {loading && (
+          <p className="text-sm text-gray-500">
+            Searching… this can take up to a minute while we query external
+            research APIs.
+          </p>
+        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {!loading && !error && results.length === 0 && (
+          <p className="text-sm text-gray-500">
+            No sources found. Try a different query, or leave the box empty to load
+            default research results.
+          </p>
+        )}
+        {!loading &&
+          visible.map((source) => (
+            <SourceCard
+              key={source.id}
+              source={source}
+              projectId={projectId}
+              sourceReferrer={{ type: "find-sources", projectId: projectId! }}
+            />
+          ))}
       </div>
 
-      {visibleCount < filtered.length && (
+      {!loading && visibleCount < results.length && (
         <div className="mt-6 text-center">
           <button
             type="button"

@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { getProject } from "@/api/projects";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ProjectTabBar } from "@/components/layout/ProjectTabBar";
-import { getProject } from "@/data/mockData";
+import type { Project } from "@/types";
 
 interface ProjectLayoutHeaderProps {
   showTabs?: boolean;
@@ -16,9 +18,17 @@ export function ProjectLayoutHeader({
   breadcrumbSuffix,
 }: ProjectLayoutHeaderProps) {
   const { projectId } = useParams<{ projectId: string }>();
-  const project = getProject(projectId ?? "");
+  const [project, setProject] = useState<Project | null | undefined>(undefined);
 
-  if (!project) return null;
+  useEffect(() => {
+    if (!projectId) {
+      setProject(null);
+      return;
+    }
+    void getProject(projectId).then((p) => setProject(p ?? null));
+  }, [projectId]);
+
+  if (project === undefined || !project) return null;
 
   const breadcrumbItems: { label: string; to?: string }[] = [
     { label: "All Projects", to: "/projects" },

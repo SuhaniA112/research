@@ -1,19 +1,31 @@
 import { Filter, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { getProject } from "@/api/projects";
+import { listSavedSources } from "@/api/sources";
 import { SavedSourceCard } from "@/components/cards/ArticleCard";
 import { ProjectLayoutHeader } from "@/components/layout/ProjectLayoutHeader";
 import { PillButton } from "@/components/ui/PillButton";
-import { getProject, sources } from "@/data/mockData";
 import { useStarred } from "@/providers/StarredProvider";
+import type { Project, Source } from "@/types";
 
 export function SavedSourcesPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const project = getProject(projectId ?? "");
+  const [project, setProject] = useState<Project | null | undefined>(undefined);
+  const [sources, setSources] = useState<Source[]>([]);
   const [filter, setFilter] = useState<"all" | "starred">("all");
   const [search, setSearch] = useState("");
   const { isSourceStarred } = useStarred();
+
+  useEffect(() => {
+    if (!projectId) {
+      setProject(null);
+      return;
+    }
+    void getProject(projectId).then((p) => setProject(p ?? null));
+    void listSavedSources(projectId).then(setSources);
+  }, [projectId]);
 
   const savedSources = sources.filter((s) => {
     const matchesFilter = filter === "all" || isSourceStarred(s.id);
@@ -21,6 +33,10 @@ export function SavedSourcesPage() {
       !search || s.title.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch && s.savedOn;
   });
+
+  if (project === undefined) {
+    return <p className="text-sm text-gray-500">Loading…</p>;
+  }
 
   if (!project) {
     return <p className="text-gray-500">Project not found.</p>;

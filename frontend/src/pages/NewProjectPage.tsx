@@ -1,11 +1,12 @@
 import { BookOpen, GraduationCap, Microscope } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { createProject } from "@/api/projects";
+import { getResearchAreaOptions } from "@/api/profile";
 import { SelectionCard } from "@/components/ui/StatCard";
 import { Tag } from "@/components/ui/Tag";
 import { InputField } from "@/components/ui/InputField";
-import { allResearchAreas } from "@/data/mockData";
 import type { ReadingLevel } from "@/types";
 
 export function NewProjectPage() {
@@ -17,6 +18,12 @@ export function NewProjectPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>("graduate");
+  const [allResearchAreas, setAllResearchAreas] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    void getResearchAreaOptions().then(setAllResearchAreas);
+  }, []);
 
   const isValid = name.trim().length > 0 && areas.length > 0;
 
@@ -41,9 +48,21 @@ export function NewProjectPage() {
     }
   }
 
-  function handleCreate() {
-    if (!isValid) return;
-    navigate("/projects");
+  async function handleCreate() {
+    if (!isValid || creating) return;
+    setCreating(true);
+    try {
+      const project = await createProject({
+        name: name.trim(),
+        description,
+        topics: areas,
+        keywords,
+        readingLevel,
+      });
+      navigate(`/projects/${project.id}`);
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -148,8 +167,8 @@ export function NewProjectPage() {
         </Link>
         <button
           type="button"
-          onClick={handleCreate}
-          disabled={!isValid}
+          onClick={() => void handleCreate()}
+          disabled={!isValid || creating}
           className="rounded-lg px-5 py-2 text-sm font-medium text-white transition-colors enabled:bg-brand-700 enabled:hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           Create Project →

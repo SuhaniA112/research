@@ -8,29 +8,73 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { getProfile, getResearchAreaOptions, updateProfile } from "@/api/profile";
 import { SelectionCard, StatCard } from "@/components/ui/StatCard";
 import { Tag } from "@/components/ui/Tag";
 import { Toggle } from "@/components/ui/Toggle";
 import { InputField } from "@/components/ui/InputField";
-import { allResearchAreas, currentUser } from "@/data/mockData";
-import type { ReadingLevel } from "@/types";
+import { clearAccessToken } from "@/lib/axios";
+import type { ReadingLevel, UserProfile } from "@/types";
 
 export function ProfilePage() {
-  const [areas, setAreas] = useState<string[]>(currentUser.researchAreas);
-  const [keywords, setKeywords] = useState<string[]>(currentUser.keywords);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [allResearchAreas, setAllResearchAreas] = useState<string[]>([]);
+  const [areas, setAreas] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
-  const [readingLevel, setReadingLevel] = useState<ReadingLevel>(currentUser.readingLevel);
-  const [occupation, setOccupation] = useState(currentUser.occupation);
-  const [institution, setInstitution] = useState(currentUser.institution);
-  const [weeklyDigest, setWeeklyDigest] = useState(currentUser.weeklyDigest);
-  const [sourceNotifications, setSourceNotifications] = useState(currentUser.sourceNotifications);
+  const [readingLevel, setReadingLevel] = useState<ReadingLevel>("graduate");
+  const [occupation, setOccupation] = useState("");
+  const [institution, setInstitution] = useState("");
+  const [weeklyDigest, setWeeklyDigest] = useState(false);
+  const [sourceNotifications, setSourceNotifications] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void getProfile().then((p) => {
+      setProfile(p);
+      setAreas(p.researchAreas);
+      setKeywords(p.keywords);
+      setReadingLevel(p.readingLevel);
+      setOccupation(p.occupation);
+      setInstitution(p.institution);
+      setWeeklyDigest(p.weeklyDigest);
+      setSourceNotifications(p.sourceNotifications);
+    });
+    void getResearchAreaOptions().then(setAllResearchAreas);
+  }, []);
 
   function toggleArea(area: string) {
     setAreas((prev) =>
       prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area],
     );
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const next = await updateProfile({
+        researchAreas: areas,
+        keywords,
+        readingLevel,
+        occupation,
+        institution,
+        weeklyDigest,
+        sourceNotifications,
+      });
+      setProfile(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleSignOut() {
+    clearAccessToken();
+  }
+
+  if (!profile) {
+    return <p className="text-sm text-gray-500">Loading…</p>;
   }
 
   return (
@@ -40,6 +84,7 @@ export function ProfilePage() {
         <div className="flex gap-2">
           <button
             type="button"
+            onClick={handleSignOut}
             className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
             <LogOut className="h-4 w-4" />
@@ -47,7 +92,9 @@ export function ProfilePage() {
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
             Save changes
@@ -57,12 +104,12 @@ export function ProfilePage() {
 
       <div className="mt-8 flex items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-700 text-2xl font-bold text-white">
-          {currentUser.name[0]}
+          {profile.name[0]}
         </div>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">{currentUser.fullName}</h2>
+          <h2 className="text-xl font-bold text-gray-900">{profile.fullName}</h2>
           <p className="text-sm text-gray-500">
-            {currentUser.occupation} · Member since {currentUser.memberSince}
+            {profile.occupation} · Member since {profile.memberSince}
           </p>
         </div>
       </div>
@@ -70,18 +117,18 @@ export function ProfilePage() {
       <div className="mt-6 grid grid-cols-3 gap-4">
         <StatCard
           label="SOURCES SAVED"
-          value={`${currentUser.sourcesSaved}`}
-          subtext={`across ${currentUser.projectsCount} projects`}
+          value={`${profile.sourcesSaved}`}
+          subtext={`across ${profile.projectsCount} projects`}
         />
         <StatCard
           label="PROJECTS"
-          value={`${currentUser.projectsCount}`}
-          subtext={`${currentUser.activeProjectsThisMonth} active this month`}
+          value={`${profile.projectsCount}`}
+          subtext={`${profile.activeProjectsThisMonth} active this month`}
         />
         <StatCard
           label="NOTES WRITTEN"
-          value={`${currentUser.notesWritten}`}
-          subtext={`last note ${currentUser.lastNoteDaysAgo} days ago`}
+          value={`${profile.notesWritten}`}
+          subtext={`last note ${profile.lastNoteDaysAgo} days ago`}
         />
       </div>
 
@@ -184,7 +231,7 @@ export function ProfilePage() {
           </div>
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-sm text-gray-700">Email address</span>
-            <span className="text-sm text-gray-500">{currentUser.email}</span>
+            <span className="text-sm text-gray-500">{profile.email}</span>
           </div>
         </div>
       </section>

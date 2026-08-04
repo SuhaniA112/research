@@ -1,29 +1,57 @@
 import { BookOpen, GraduationCap, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { getProfile, getResearchAreaOptions, updateProfile } from "@/api/profile";
 import { SelectionCard } from "@/components/ui/StatCard";
 import { Tag } from "@/components/ui/Tag";
 import { InputField } from "@/components/ui/InputField";
-import { allResearchAreas, currentUser } from "@/data/mockData";
 import { setOnboardingComplete } from "@/lib/onboarding";
-import type { ReadingLevel } from "@/types";
+import type { ReadingLevel, UserProfile } from "@/types";
 
 export function OnboardingPage() {
   const navigate = useNavigate();
 
-  function finishOnboarding() {
-    setOnboardingComplete();
-    navigate("/hub");
-  }
-  const [areas, setAreas] = useState<string[]>(currentUser.researchAreas);
-  const [keywords, setKeywords] = useState<string[]>(currentUser.keywords);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [allResearchAreas, setAllResearchAreas] = useState<string[]>([]);
+  const [areas, setAreas] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>("graduate");
   const [occupation, setOccupation] = useState("");
   const [institution, setInstitution] = useState("");
   const [emailOptIn, setEmailOptIn] = useState(true);
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    void getProfile().then((p) => {
+      setProfile(p);
+      setAreas(p.researchAreas);
+      setKeywords(p.keywords);
+      setReadingLevel(p.readingLevel);
+      setOccupation(p.occupation);
+      setInstitution(p.institution);
+      setEmail(p.email);
+      setEmailOptIn(p.weeklyDigest);
+    });
+    void getResearchAreaOptions().then(setAllResearchAreas);
+  }, []);
+
+  async function finishOnboarding(persist: boolean) {
+    if (persist) {
+      await updateProfile({
+        researchAreas: areas,
+        keywords,
+        readingLevel,
+        occupation,
+        institution,
+        email: email || undefined,
+        weeklyDigest: emailOptIn,
+      });
+    }
+    setOnboardingComplete();
+    navigate("/hub");
+  }
 
   function toggleArea(area: string) {
     setAreas((prev) =>
@@ -39,9 +67,13 @@ export function OnboardingPage() {
     }
   }
 
+  if (!profile) {
+    return <p className="text-sm text-gray-500">Loading…</p>;
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900">Welcome {currentUser.name}!</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Welcome {profile.name}!</h1>
       <p className="mt-2 text-sm text-gray-600">
         Answer a couple questions about yourself to help us find the relevant sources for your
         research!
@@ -171,14 +203,14 @@ export function OnboardingPage() {
       <div className="mt-10 flex items-center justify-between">
         <button
           type="button"
-          onClick={finishOnboarding}
+          onClick={() => void finishOnboarding(false)}
           className="text-sm font-medium text-gray-500 hover:text-gray-700"
         >
           Skip for now
         </button>
         <button
           type="button"
-          onClick={finishOnboarding}
+          onClick={() => void finishOnboarding(true)}
           className="rounded-lg bg-brand-700 px-5 py-2 text-sm font-medium text-white hover:bg-brand-800"
         >
           Continue →

@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { projects, sources } from "@/data/mockData";
+import { listProjectsSync } from "@/api/projects";
+import { listSourcesSync } from "@/api/sources";
 
 interface StarredContextValue {
   isProjectStarred: (id: string) => boolean;
@@ -24,10 +25,10 @@ function buildInitialStarred<T extends { id: string; starred?: boolean }>(items:
 
 export function StarredProvider({ children }: { children: ReactNode }) {
   const [starredProjects, setStarredProjects] = useState<Record<string, boolean>>(() =>
-    buildInitialStarred(projects),
+    buildInitialStarred(listProjectsSync()),
   );
   const [starredSources, setStarredSources] = useState<Record<string, boolean>>(() =>
-    buildInitialStarred(sources),
+    buildInitialStarred(listSourcesSync()),
   );
 
   const isProjectStarred = useCallback(

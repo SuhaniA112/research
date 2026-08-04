@@ -10,15 +10,18 @@ export interface Source {
   publishedYear: number;
   description: string;
   authors: string[];
-  relevance: number;
-  similarity: number;
-  citations: number;
-  citesSaved: number;
-  citedBySaved: number;
+  /** null = soft placeholder until scoring APIs exist */
+  relevance: number | null;
+  similarity: number | null;
+  citations: number | null;
+  citesSaved: number | null;
+  citedBySaved: number | null;
   relevantTo: string[];
   similarTo: string[];
   keyFindings: { text: string; section: string }[];
   publicationUrl: string;
+  externalId?: string;
+  pdfUrl?: string | null;
   starred?: boolean;
   savedOn?: string;
   notes?: { id: string; text: string; date: string }[];

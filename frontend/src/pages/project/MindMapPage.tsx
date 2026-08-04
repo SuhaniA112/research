@@ -1,13 +1,14 @@
 import { Pencil, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { getMindMap } from "@/api/mindMap";
+import { listSavedSources } from "@/api/sources";
 import { SourceListItem } from "@/components/cards/SourceListItem";
 import { ProjectLayoutHeader } from "@/components/layout/ProjectLayoutHeader";
 import { PanZoomSvg, usePanZoomScale } from "@/components/ui/PanZoomSvg";
 import { Tag } from "@/components/ui/Tag";
 import { getIconSizeClass, IconButton } from "@/components/ui/IconButton";
-import { mindMapEdges, mindMapNodes, sources } from "@/data/mockData";
 import { getNodeLabelLayout, getNodeRadius } from "@/lib/mindMapLayout";
 import {
   buildDepthMap,
@@ -19,7 +20,7 @@ import {
   getRelatedSources,
   getSubtopicRelevance,
 } from "@/lib/mindMap";
-import type { MindMapNode } from "@/types";
+import type { MindMapEdge, MindMapNode, Source } from "@/types";
 
 function MindMapNodeShape({
   node,
@@ -77,35 +78,87 @@ function MindMapNodeShape({
 
 export function MindMapPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [selectedNode, setSelectedNode] = useState<MindMapNode>(
-    mindMapNodes.find((n) => n.type === "project") ?? mindMapNodes[0]!,
-  );
+  const [mindMapNodes, setMindMapNodes] = useState<MindMapNode[]>([]);
+  const [mindMapEdges, setMindMapEdges] = useState<MindMapEdge[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [selectedNode, setSelectedNode] = useState<MindMapNode | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const depthMap = useMemo(() => buildDepthMap(mindMapEdges), []);
+  useEffect(() => {
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void Promise.all([getMindMap(projectId), listSavedSources(projectId)]).then(
+      ([data, savedSources]) => {
+        if (cancelled) return;
+        setMindMapNodes(data.nodes);
+        setMindMapEdges(data.edges);
+        setSources(savedSources);
+        setSelectedNode(
+          data.nodes.find((n) => n.type === "project") ?? data.nodes[0] ?? null,
+        );
+        setLoading(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const depthMap = useMemo(() => buildDepthMap(mindMapEdges), [mindMapEdges]);
   const nodeRadii = useMemo(
     () =>
       Object.fromEntries(
         mindMapNodes.map((node) => [node.id, getNodeRadius(node.label, node.type)]),
       ),
-    [],
+    [mindMapNodes],
   );
 
   const childNodes = useMemo(
-    () => getChildNodes(selectedNode.id, mindMapEdges, mindMapNodes),
-    [selectedNode.id],
+    () =>
+      selectedNode
+        ? getChildNodes(selectedNode.id, mindMapEdges, mindMapNodes)
+        : [],
+    [selectedNode, mindMapEdges, mindMapNodes],
   );
   const parentNode = useMemo(
-    () => getParentNode(selectedNode.id, mindMapEdges, mindMapNodes),
-    [selectedNode.id],
+    () =>
+      selectedNode
+        ? getParentNode(selectedNode.id, mindMapEdges, mindMapNodes)
+        : null,
+    [selectedNode, mindMapEdges, mindMapNodes],
   );
   const relatedSources = useMemo(
-    () => getRelatedSources(selectedNode, sources),
-    [selectedNode],
+    () => (selectedNode ? getRelatedSources(selectedNode, sources) : []),
+    [selectedNode, sources],
   );
   const topicCount = useMemo(
     () => mindMapNodes.filter((n) => n.type === "topic").length,
-    [],
+    [mindMapNodes],
   );
+
+  if (loading) {
+    return (
+      <div>
+        <ProjectLayoutHeader />
+        <p className="mt-8 text-sm text-gray-500">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!selectedNode || mindMapNodes.length === 0) {
+    return (
+      <div>
+        <ProjectLayoutHeader />
+        <p className="mt-8 text-sm text-gray-500">
+          No mind map yet. Add project topics or save sources to generate one.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

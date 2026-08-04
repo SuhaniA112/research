@@ -1,4 +1,5 @@
-import { getProject, getSource, projects } from "@/data/mockData";
+import { getProjectSync, listProjectsSync } from "@/api/projects";
+import { getSourceSync } from "@/api/sources";
 
 export interface SourceBreadcrumbItem {
   label: string;
@@ -18,7 +19,7 @@ export type SourceReferrer =
   | { type: "continue"; projectId: string; breadcrumbs: SourceBreadcrumbItem[] };
 
 export function getSourcePagePath(sourceId: string, projectId?: string): string {
-  const resolvedProjectId = projectId ?? projects[0]?.id ?? "1";
+  const resolvedProjectId = projectId ?? listProjectsSync()[0]?.id ?? "1";
   return `/projects/${resolvedProjectId}/sources/${sourceId}`;
 }
 
@@ -32,7 +33,7 @@ export function buildSourceBreadcrumbs(referrer: SourceReferrer): SourceBreadcru
     case "saved-sources":
     case "mind-map":
     case "project-overview": {
-      const project = getProject(referrer.projectId);
+      const project = getProjectSync(referrer.projectId);
       const items: SourceBreadcrumbItem[] = [
         { label: "All Projects", to: "/projects" },
         { label: project?.name ?? "Project", to: `/projects/${referrer.projectId}` },
@@ -61,16 +62,16 @@ export function buildSourceBreadcrumbs(referrer: SourceReferrer): SourceBreadcru
 export function getSourcePageLink(
   sourceId: string,
   referrer: SourceReferrer,
-): { pathname: string; state: SourceNavigationState } {
+): { to: string; state: SourceNavigationState } {
   const projectId =
     referrer.type === "hub"
-      ? (projects[0]?.id ?? "1")
+      ? (listProjectsSync()[0]?.id ?? "1")
       : referrer.type === "continue"
         ? referrer.projectId
         : referrer.projectId;
 
   return {
-    pathname: getSourcePagePath(sourceId, projectId),
+    to: getSourcePagePath(sourceId, projectId),
     state: { breadcrumbs: buildSourceBreadcrumbs(referrer) },
   };
 }
@@ -86,5 +87,5 @@ export function getFindSourcesPath(projectId: string, query?: string): string {
 }
 
 export function getPublicationUrl(sourceId: string): string {
-  return getSource(sourceId)?.publicationUrl ?? "#";
+  return getSourceSync(sourceId)?.publicationUrl ?? "#";
 }

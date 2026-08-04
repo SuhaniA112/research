@@ -17,3 +17,5 @@ class ProjectResponse(BaseModel):
     description: str | None
     created_at: datetime
     updated_at: datetime
+    source_count: int = 0
+    topics: list[str] = Field(default_factory=list)

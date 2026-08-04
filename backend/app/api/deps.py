@@ -115,8 +115,11 @@ VoyageClientDep = Annotated[VoyageEmbeddingClient, Depends(get_voyage_client)]
 OpenRouterClientDep = Annotated[OpenRouterClient, Depends(get_openrouter_client)]
 
 
-def get_project_service(project_repo: ProjectRepoDep) -> ProjectService:
-    return ProjectService(project_repo)
+def get_project_service(
+    project_repo: ProjectRepoDep,
+    project_paper_repo: ProjectPaperRepoDep,
+) -> ProjectService:
+    return ProjectService(project_repo, project_paper_repo)
 
 
 def get_paper_indexer() -> PaperIndexer:
