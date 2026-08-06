@@ -19,12 +19,15 @@ const paperCache = new Map<string, Source>();
 
 export function cacheSource(source: Source): Source {
   paperCache.set(source.id, source);
+  if (source.externalId) {
+    paperCache.set(source.externalId, source);
+  }
   return source;
 }
 
 export function cacheSources(sources: Source[]): Source[] {
   for (const source of sources) {
-    paperCache.set(source.id, source);
+    cacheSource(source);
   }
   return sources;
 }

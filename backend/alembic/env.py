@@ -14,9 +14,6 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.core.config import settings
 from app.models import Base
 
-# Import all models so Base.metadata is complete.
-import app.models  # noqa: F401
-
 config = context.config
 
 if config.config_file_name is not None:

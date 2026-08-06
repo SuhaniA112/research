@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { StarButton } from "@/components/ui/StarButton";
 import { Tag } from "@/components/ui/Tag";
 import { getIconSizeClass, IconButton } from "@/components/ui/IconButton";
+import { formatUpdatedAgo } from "@/lib/dates";
 import { useStarred } from "@/providers/StarredProvider";
 import type { Project } from "@/types";
 
@@ -60,13 +61,7 @@ export function ProjectCard({ project, onDelete, deleting = false }: ProjectCard
         <span>
           {project.sourceCount} {project.sourceCount === 1 ? "Source" : "Sources"}
         </span>
-        <span>
-          {project.updatedDaysAgo === 0
-            ? "Updated today"
-            : project.updatedDaysAgo === 1
-              ? "Updated 1 day ago"
-              : `Updated ${project.updatedDaysAgo} days ago`}
-        </span>
+        <span>{formatUpdatedAgo(project.updatedAt)}</span>
       </div>
     </div>
   );

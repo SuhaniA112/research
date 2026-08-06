@@ -1,5 +1,11 @@
 import type { MindMapEdge, MindMapNode, Project, Source, UserProfile } from "@/types";
-import { colors } from "@/lib/theme";
+
+function daysAgoIso(days: number): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() - days);
+  return d.toISOString();
+}
 
 export const currentUser: UserProfile = {
   name: "Alex",
@@ -41,7 +47,7 @@ export const projects: Project[] = [
     keywords: ["accessibility", "LLM"],
     readingLevel: "graduate",
     sourceCount: 24,
-    updatedDaysAgo: 2,
+    updatedAt: daysAgoIso(2),
     starred: true,
   },
   {
@@ -53,7 +59,7 @@ export const projects: Project[] = [
     keywords: ["evaluation", "benchmarks"],
     readingLevel: "expert",
     sourceCount: 18,
-    updatedDaysAgo: 5,
+    updatedAt: daysAgoIso(5),
     starred: false,
   },
   {
@@ -65,7 +71,7 @@ export const projects: Project[] = [
     keywords: ["robotics"],
     readingLevel: "casual",
     sourceCount: 12,
-    updatedDaysAgo: 7,
+    updatedAt: daysAgoIso(7),
     starred: true,
   },
   {
@@ -77,7 +83,7 @@ export const projects: Project[] = [
     keywords: ["multimodal", "vision"],
     readingLevel: "graduate",
     sourceCount: 31,
-    updatedDaysAgo: 1,
+    updatedAt: daysAgoIso(1),
     starred: false,
   },
 ];
@@ -136,10 +142,6 @@ export const sources: Source[] = [
     publicationUrl: "https://dl.acm.org/doi/10.1145/3613904.3642134",
     starred: true,
     savedOn: "Mar 12, 2024",
-    notes: [
-      { id: "n1", text: "Strong methodology section — compare with our approach.", date: "Mar 13, 2024" },
-      { id: "n2", text: "Citation network overlaps with 3 of our saved sources.", date: "Mar 15, 2024" },
-    ],
   },
   {
     id: "s2",
@@ -164,7 +166,6 @@ export const sources: Source[] = [
     publicationUrl: "https://papers.nips.cc/paper_files/paper/2023",
     starred: false,
     savedOn: "Feb 28, 2024",
-    notes: [{ id: "n3", text: "Relevant benchmark dataset for our evaluation pipeline.", date: "Mar 1, 2024" }],
   },
   {
     id: "s3",
@@ -189,7 +190,6 @@ export const sources: Source[] = [
     publicationUrl: "https://ieeexplore.ieee.org/document/10501234",
     starred: true,
     savedOn: "Apr 2, 2024",
-    notes: [],
   },
   {
     id: "s4",
@@ -238,14 +238,6 @@ export const sources: Source[] = [
   },
 ];
 
-export function getProject(id: string): Project | undefined {
-  return projects.find((p) => p.id === id);
-}
-
-export function getSource(id: string): Source | undefined {
-  return sources.find((s) => s.id === id);
-}
-
 export const mindMapNodes: MindMapNode[] = [
   { id: "center", label: "Accessible AI Interfaces", type: "project", x: 50, y: 50 },
   { id: "t1", label: "Voice UI", type: "topic", x: 25, y: 25, sourcesSaved: 8, subTopics: 3 },
@@ -275,12 +267,6 @@ export const mindMapEdges: MindMapEdge[] = [
   { from: "t3", to: "st6" },
   { from: "t4", to: "st7" },
   { from: "t4", to: "st8" },
-];
-
-export const sourceBreakdown = [
-  { name: "Journals", value: 45, color: colors.fg.muted },
-  { name: "Preprints", value: 35, color: colors.fg.secondary },
-  { name: "Others", value: 20, color: colors.border },
 ];
 
 export const sourceRecency = [

@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { getProject } from "@/api/projects";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { ProjectTabBar } from "@/components/layout/ProjectTabBar";
+import { formatUpdatedAgo } from "@/lib/dates";
 import type { Project } from "@/types";
 
 interface ProjectLayoutHeaderProps {
@@ -45,7 +46,7 @@ export function ProjectLayoutHeader({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Updated {project.updatedDaysAgo} Days Ago • {project.sourceCount} Sources
+            {formatUpdatedAgo(project.updatedAt)} • {project.sourceCount} Sources
           </p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-600">
             {project.description}

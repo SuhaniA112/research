@@ -24,7 +24,6 @@ export interface Source {
   pdfUrl?: string | null;
   starred?: boolean;
   savedOn?: string;
-  notes?: { id: string; text: string; date: string }[];
 }
 
 export interface Project {
@@ -35,7 +34,8 @@ export interface Project {
   keywords: string[];
   readingLevel: ReadingLevel;
   sourceCount: number;
-  updatedDaysAgo: number;
+  /** ISO timestamp of last project update. */
+  updatedAt: string;
   starred: boolean;
 }
 

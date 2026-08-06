@@ -26,13 +26,22 @@ export function listSourcesSync(): Source[] {
 }
 
 export async function getSource(sourceId: string): Promise<Source | undefined> {
+  const id = decodeURIComponent(sourceId);
   if (env.useMocks) {
-    return mockStore.sources.find((s) => s.id === sourceId);
+    return mockStore.sources.find((s) => s.id === id);
   }
-  const cached = getCachedSource(sourceId);
+  const cached = getCachedSource(id) ?? getCachedSource(sourceId);
   if (cached) return cached;
+  // Unsaved discovery/legacy papers use non-UUID ids and are cache-only.
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      id,
+    )
+  ) {
+    return undefined;
+  }
   try {
-    const { data } = await apiClient.get<BackendPaper>(`/api/v1/papers/${sourceId}`);
+    const { data } = await apiClient.get<BackendPaper>(`/api/v1/papers/${id}`);
     return mapBackendPaperToSource(data);
   } catch {
     return undefined;
@@ -79,7 +88,7 @@ export async function saveSource(
     const project = mockStore.projects.find((p) => p.id === projectId);
     if (project) {
       project.sourceCount += 1;
-      project.updatedDaysAgo = 0;
+      project.updatedAt = new Date().toISOString();
     }
     return;
   }
@@ -114,7 +123,7 @@ export async function unsaveSource(
     const project = mockStore.projects.find((p) => p.id === projectId);
     if (project && project.sourceCount > 0) {
       project.sourceCount -= 1;
-      project.updatedDaysAgo = 0;
+      project.updatedAt = new Date().toISOString();
     }
     return;
   }

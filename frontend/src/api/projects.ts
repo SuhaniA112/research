@@ -38,12 +38,6 @@ interface BackendProject {
   reading_level?: ReadingLevel;
 }
 
-function formatUpdatedDaysAgo(updatedAt: string): number {
-  const updated = new Date(updatedAt).getTime();
-  if (Number.isNaN(updated)) return 0;
-  return Math.max(0, Math.floor((Date.now() - updated) / 86_400_000));
-}
-
 function mapBackendProject(p: BackendProject): Project {
   return cacheProject({
     id: p.id,
@@ -53,9 +47,15 @@ function mapBackendProject(p: BackendProject): Project {
     keywords: p.keywords ?? [],
     readingLevel: p.reading_level ?? "graduate",
     sourceCount: p.source_count ?? 0,
-    updatedDaysAgo: formatUpdatedDaysAgo(p.updated_at),
+    updatedAt: p.updated_at,
     starred: false,
   });
+}
+
+function sortByUpdatedAtDesc(projects: Project[]): Project[] {
+  return [...projects].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
 }
 
 const projectCache = new Map<string, Project>();
@@ -72,17 +72,17 @@ export function getProjectSync(projectId: string): Project | undefined {
 
 export function listProjectsSync(): Project[] {
   if (projectCache.size > 0) {
-    return [...projectCache.values()];
+    return sortByUpdatedAtDesc([...projectCache.values()]);
   }
-  return mockStore.projects;
+  return sortByUpdatedAtDesc(mockStore.projects);
 }
 
 export async function listProjects(): Promise<Project[]> {
   if (env.useMocks) {
-    return mockStore.projects.map(cacheProject);
+    return sortByUpdatedAtDesc(mockStore.projects.map(cacheProject));
   }
   const { data } = await apiClient.get<BackendProject[]>("/api/v1/projects");
-  return data.map(mapBackendProject);
+  return sortByUpdatedAtDesc(data.map(mapBackendProject));
 }
 
 export async function getProject(projectId: string): Promise<Project | undefined> {
@@ -98,6 +98,7 @@ export async function getProject(projectId: string): Promise<Project | undefined
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
   if (env.useMocks) {
+    const now = new Date().toISOString();
     const project: Project = {
       id: String(Date.now()),
       name: input.name,
@@ -106,7 +107,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
       keywords: input.keywords,
       readingLevel: input.readingLevel,
       sourceCount: 0,
-      updatedDaysAgo: 0,
+      updatedAt: now,
       starred: false,
     };
     mockStore.projects = [project, ...mockStore.projects];

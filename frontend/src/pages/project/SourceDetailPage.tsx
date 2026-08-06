@@ -9,6 +9,7 @@ import {
   updateSourceNote,
   type SourceNote,
 } from "@/api/notes";
+import { cacheSource } from "@/api/mappers";
 import { getProject } from "@/api/projects";
 import {
   getSource,
@@ -24,6 +25,7 @@ import { SourceMetricsPanel } from "@/components/source/SourceMetricsPanel";
 import { PillButton } from "@/components/ui/PillButton";
 import { Tag } from "@/components/ui/Tag";
 import {
+  encodeSourceId,
   getDefaultSourceBreadcrumbs,
   type SourceNavigationState,
 } from "@/lib/sourcePaths";
@@ -49,14 +51,47 @@ export function SourceDetailPage() {
       setSource(null);
       return;
     }
-    void getProject(projectId).then((p) => setProject(p ?? null));
-    void getSource(sourceId).then((s) => setSource(s ?? null));
+    const navState = location.state as SourceNavigationState | null;
+    if (navState?.source) {
+      cacheSource(navState.source);
+      setSource(navState.source);
+    }
+
+    void getProject(projectId).then((p) => {
+      if (p) {
+        setProject(p);
+        return;
+      }
+      // Hub (and similar) may open a source before a real project is selected.
+      if (navState?.source || projectId === "hub") {
+        setProject({
+          id: projectId,
+          name: "Hub",
+          description: "",
+          topics: [],
+          keywords: [],
+          readingLevel: "graduate",
+          sourceCount: 0,
+          updatedAt: new Date().toISOString(),
+          starred: false,
+        });
+        return;
+      }
+      setProject(null);
+    });
+    void getSource(sourceId).then((s) => {
+      if (s) {
+        setSource(s);
+        return;
+      }
+      if (!navState?.source) setSource(null);
+    });
     void listRelatedSources(sourceId).then(setRelatedPapers);
     void listCitingSources(sourceId).then(setCitedSources);
     void listSourceNotes(sourceId).then(setNotes);
     setDraft("");
     setEditingId(null);
-  }, [projectId, sourceId]);
+  }, [projectId, sourceId, location.state]);
 
   useEffect(() => {
     if (!sourceId) return;
@@ -114,7 +149,7 @@ export function SourceDetailPage() {
       ...parentBreadcrumbs,
       {
         label: source.title,
-        to: `/projects/${project.id}/sources/${source.id}`,
+        to: `/projects/${project.id}/sources/${encodeSourceId(source.id)}`,
       },
     ],
   };

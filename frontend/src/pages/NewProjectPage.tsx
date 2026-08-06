@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCreateProject } from "@/api/projects";
 import { getResearchAreaOptions } from "@/api/profile";
 import { SelectionCard } from "@/components/ui/StatCard";
+import { ResearchAreaPicker } from "@/components/ui/ResearchAreaPicker";
 import { Tag } from "@/components/ui/Tag";
 import { InputField } from "@/components/ui/InputField";
 import type { ReadingLevel } from "@/types";
@@ -27,12 +28,6 @@ export function NewProjectPage() {
   }, []);
 
   const isValid = name.trim().length > 0 && areas.length > 0;
-
-  function toggleArea(area: string) {
-    setAreas((prev) =>
-      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area],
-    );
-  }
 
   function addKeyword(value: string) {
     const kw = value.trim().replace(/,$/, "");
@@ -100,14 +95,11 @@ export function NewProjectPage() {
         </h2>
 
         <p className="mt-4 text-xs font-semibold text-gray-700">Research Area(s)</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {allResearchAreas.map((area) => (
-            <button key={area} type="button" onClick={() => toggleArea(area)}>
-              <Tag variant={areas.includes(area) ? "brand" : "outline"}>{area}</Tag>
-            </button>
-          ))}
-          <Tag variant="outline">Add Topic +</Tag>
-        </div>
+        <ResearchAreaPicker
+          options={allResearchAreas}
+          selected={areas}
+          onChange={setAreas}
+        />
 
         <p className="mt-4 text-xs font-semibold text-gray-700">Specific Keywords</p>
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 focus-within:border-brand-700 focus-within:ring-1 focus-within:ring-brand-700">

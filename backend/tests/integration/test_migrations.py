@@ -116,7 +116,7 @@ def test_migration_clean_install_from_empty_database(test_database_url) -> None:
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0001_shared_search"
+    assert version == "0002_project_interest_profile"
 
     # alembic current should report head (no unfinished upgrade).
     command.current(cfg)
@@ -157,7 +157,7 @@ def test_migration_upgrade_from_existing_baseline_schema(test_database_url) -> N
 
     cfg = _alembic_config(test_database_url)
     head = _head_revision(cfg)
-    # 0000 is idempotent (skips existing baseline); 0001 adds search tables.
+    # 0000 is idempotent (skips existing baseline); later revisions are additive.
     command.upgrade(cfg, "head")
 
     after = asyncio.run(_list_public_tables(test_database_url))
@@ -165,5 +165,5 @@ def test_migration_upgrade_from_existing_baseline_schema(test_database_url) -> N
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0001_shared_search"
+    assert version == "0002_project_interest_profile"
     command.current(cfg)

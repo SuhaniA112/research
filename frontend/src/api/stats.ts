@@ -1,12 +1,12 @@
 import { listSavedSources } from "@/api/sources";
 import { env } from "@/config/env";
-import { sourceBreakdown, sourceRecency } from "@/data/mockData";
+import { sourceRecency } from "@/data/mockData";
 import { colors } from "@/lib/theme";
 import type { Source } from "@/types";
 
 export interface SourceBreakdownItem {
   name: string;
-  value: number | string;
+  value: number;
   color: string;
 }
 
@@ -17,13 +17,12 @@ export interface SourceRecencyItem {
 
 export interface SourceRecencyStats {
   bars: SourceRecencyItem[];
-  /** Cutoff year maximizing sources from this year onwards (via densest 3-year window). */
-  sinceYear: number;
-  sinceCount: number;
+  /** Earliest published year among saved sources. */
+  earliestYear: number;
   total: number;
   /** Chart start year — used for color gradient. */
   startYear: number;
-  /** Always the current calendar year for “last 3 years” coloring. */
+  /** Chart end year (max of latest source year and current year). */
   presentYear: number;
 }
 
@@ -33,6 +32,63 @@ export interface SourceValidityStats {
   metrics: [string, string][];
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  arxiv: "arXiv",
+  openalex: "OpenAlex",
+  semantic_scholar: "Semantic Scholar",
+  dblp: "DBLP",
+};
+
+const BREAKDOWN_COLORS = [
+  colors.fg.secondary, // darkest — highest share
+  colors.fg.muted,
+  colors.border, // lightest — lowest share
+] as const;
+
+function formatSourceType(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "Unknown";
+  return PROVIDER_LABELS[trimmed.toLowerCase()] ?? trimmed;
+}
+
+/**
+ * Top 2 source providers/venues by count; remaining types roll into Other.
+ * Values are percentages of saved sources. Darkest color = highest share.
+ */
+function buildSourceBreakdown(sources: Source[]): SourceBreakdownItem[] {
+  if (sources.length === 0) return [];
+
+  const counts = new Map<string, number>();
+  for (const source of sources) {
+    const label = formatSourceType(source.source);
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  const ranked = [...counts.entries()].sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  );
+  const top = ranked.slice(0, 2);
+  const otherCount = ranked.slice(2).reduce((sum, [, n]) => sum + n, 0);
+
+  const groups: { name: string; count: number }[] = top.map(([name, count]) => ({
+    name,
+    count,
+  }));
+  if (otherCount > 0) {
+    groups.push({ name: "Other", count: otherCount });
+  }
+
+  // Color by amount (darkest = highest), independent of top-2 vs Other order
+  groups.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  const total = sources.length;
+  return groups.map((group, index) => ({
+    name: group.name,
+    value: Math.round((group.count / total) * 100),
+    color: BREAKDOWN_COLORS[index] ?? colors.border,
+  }));
+}
+
 function yearOf(source: Source): number | null {
   const year = source.publishedYear;
   if (!year || year < 1900 || year > 2100) return null;
@@ -40,13 +96,10 @@ function yearOf(source: Source): number | null {
 }
 
 /**
- * Build recency chart + “X since Year” from saved sources.
- *
- * sinceYear = start of the densest 3-year publication window
- * (the year after which / from which the most sources cluster),
- * sinceCount = sources with publishedYear >= sinceYear.
+ * Build recency chart from saved sources.
+ * Subtitle uses total sources counted from the earliest publication year.
  */
-export function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats | null {
+function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats | null {
   const years = sources
     .map(yearOf)
     .filter((year): year is number => year != null)
@@ -54,12 +107,11 @@ export function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats |
 
   if (years.length === 0) return null;
 
-  const minYear = years[0]!;
+  const earliestYear = years[0]!;
   const maxYear = years[years.length - 1]!;
   const presentYear = new Date().getFullYear();
-  // Anchor the chart on “present” so last-3-years coloring is correct
   const endYear = Math.max(maxYear, presentYear);
-  const startYear = Math.min(minYear, Math.max(endYear - 6, minYear));
+  const startYear = Math.min(earliestYear, Math.max(endYear - 6, earliestYear));
 
   const counts = new Map<number, number>();
   for (let y = startYear; y <= endYear; y++) counts.set(y, 0);
@@ -67,22 +119,6 @@ export function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats |
     if (year < startYear || year > endYear) continue;
     counts.set(year, (counts.get(year) ?? 0) + 1);
   }
-
-  // Densest 3-year window → “since” cutoff (most sources clustered from this year)
-  let sinceYear = Math.max(startYear, endYear - 2);
-  let bestWindow = -1;
-  for (let y = startYear; y <= endYear; y++) {
-    let windowCount = 0;
-    for (let w = y; w <= Math.min(y + 2, endYear); w++) {
-      windowCount += counts.get(w) ?? 0;
-    }
-    if (windowCount >= bestWindow) {
-      bestWindow = windowCount;
-      sinceYear = y;
-    }
-  }
-
-  const sinceCount = years.filter((year) => year >= sinceYear).length;
 
   const bars: SourceRecencyItem[] = [];
   for (let y = startYear; y <= endYear; y++) {
@@ -94,8 +130,7 @@ export function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats |
 
   return {
     bars,
-    sinceYear,
-    sinceCount,
+    earliestYear,
     total: years.length,
     startYear,
     presentYear,
@@ -105,16 +140,8 @@ export function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats |
 export async function getSourceBreakdown(
   projectId: string,
 ): Promise<SourceBreakdownItem[]> {
-  if (env.useMocks) {
-    void projectId;
-    return sourceBreakdown;
-  }
-  await listSavedSources(projectId).catch(() => []);
-  return [
-    { name: "Journals", value: "[X]", color: colors.fg.muted },
-    { name: "Preprints", value: "[X]", color: colors.fg.secondary },
-    { name: "Others", value: "[X]", color: colors.border },
-  ];
+  const saved = await listSavedSources(projectId).catch(() => []);
+  return buildSourceBreakdown(saved);
 }
 
 export async function getSourceRecency(
@@ -133,14 +160,10 @@ export async function getSourceRecency(
       count: item.count,
     }));
     const startYear = Number(bars[0]?.year ?? presentYear - 6);
-    const sinceYear = 2021;
-    const sinceCount = bars
-      .filter((b) => Number(b.year) >= sinceYear)
-      .reduce((sum, b) => sum + b.count, 0);
+    const earliestYear = startYear;
     return {
       bars,
-      sinceYear,
-      sinceCount,
+      earliestYear,
       total: bars.reduce((sum, b) => sum + b.count, 0),
       startYear,
       presentYear,

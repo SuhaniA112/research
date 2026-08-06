@@ -44,13 +44,48 @@ interface LegacySearchResponse {
   papers: IndPaper[];
 }
 
+function sourceMatchesTerms(source: Source, terms: string[]): boolean {
+  if (terms.length === 0) return true;
+  const haystack = [
+    source.title,
+    source.description,
+    ...source.topics,
+    ...source.authors,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.some((term) => haystack.includes(term));
+}
+
+/** URL-safe id for papers that are not yet persisted (legacy search results). */
+function toUrlSafePaperId(raw: string, index: number): string {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      raw,
+    )
+  ) {
+    return raw;
+  }
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = (Math.imul(31, hash) + raw.charCodeAt(i)) >>> 0;
+  }
+  const slug = raw
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return `ext-${hash.toString(36)}-${slug || String(index)}`;
+}
+
 function indPaperToBackendPaper(paper: IndPaper, index: number): BackendPaper {
   const externalId =
     paper.external_id?.trim() ||
     `${paper.source}:${paper.title}`.slice(0, 200) ||
     `legacy-${index}`;
   return {
-    id: externalId,
+    id: toUrlSafePaperId(externalId, index),
     source: paper.source,
     external_id: externalId,
     title: paper.title,
@@ -72,27 +107,30 @@ async function searchLegacyPapers(query: string): Promise<Source[]> {
   const mapped = data.papers.map((paper, index) =>
     mapBackendPaperToSource(indPaperToBackendPaper(paper, index)),
   );
-  const q = query.trim().toLowerCase();
-  if (!q) return mapped;
-  return mapped.filter(
-    (s) =>
-      s.title.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q) ||
-      s.topics.some((t) => t.toLowerCase().includes(q)) ||
-      s.authors.some((a) => a.toLowerCase().includes(q)),
-  );
+  const terms = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((term) => term.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, ""))
+    .filter((term) => term.length > 1);
+  if (terms.length === 0) return mapped;
+  const filtered = mapped.filter((source) => sourceMatchesTerms(source, terms));
+  // Prefer term matches, but never return empty when providers found papers.
+  return filtered.length > 0 ? filtered : mapped;
 }
 
-export async function searchSources(query = ""): Promise<Source[]> {
+export async function searchSources(
+  query = "",
+  options?: { fallbackToLegacy?: boolean },
+): Promise<Source[]> {
+  const fallbackToLegacy = options?.fallbackToLegacy !== false;
+
   if (env.useMocks) {
     const q = query.trim().toLowerCase();
     if (!q) return mockStore.sources;
-    return mockStore.sources.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.topics.some((t) => t.toLowerCase().includes(q)) ||
-        s.authors.some((a) => a.toLowerCase().includes(q)),
-    );
+    const terms = q.split(/\s+/).filter(Boolean);
+    const filtered = mockStore.sources.filter((s) => sourceMatchesTerms(s, terms));
+    return filtered.length > 0 ? filtered : mockStore.sources;
   }
 
   const q = query.trim() || "research";
@@ -113,7 +151,8 @@ export async function searchSources(query = ""): Promise<Source[]> {
         relevance: similarity,
       });
     });
-  } catch {
+  } catch (err) {
+    if (!fallbackToLegacy) throw err;
     // Discovery needs Voyage; legacy multi-provider search still works without it.
     return searchLegacyPapers(q);
   }

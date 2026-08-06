@@ -15,27 +15,14 @@ function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
 }
 
-/**
- * Gradient by recency: lightest for earliest years, darkest for current /
- * last 3 calendar years.
- */
-export function recencyBarFill(
+/** Continuous gradient: lightest for earliest years, darkest for most recent. */
+function recencyBarFill(
   year: number,
   startYear: number,
   presentYear: number,
 ): string {
-  const recentStart = presentYear - 2;
-  let t: number;
-
-  if (year >= recentStart) {
-    // Last 3 years sit on the dark end of the scale
-    t = 0.82 + (0.18 * (year - recentStart)) / 2;
-  } else {
-    const span = Math.max(recentStart - startYear, 1);
-    t = 0.06 + 0.64 * ((year - startYear) / span);
-  }
-
-  t = Math.min(1, Math.max(0, t));
+  const span = Math.max(presentYear - startYear, 1);
+  const t = Math.min(1, Math.max(0, (year - startYear) / span));
   const r = lerp(FILL_LIGHT.r, FILL_DARK.r, t);
   const g = lerp(FILL_LIGHT.g, FILL_DARK.g, t);
   const b = lerp(FILL_LIGHT.b, FILL_DARK.b, t);
@@ -54,7 +41,7 @@ export function SourceRecencyCard({ stats }: SourceRecencyCardProps) {
     );
   }
 
-  const { bars, sinceYear, sinceCount, startYear, presentYear } = stats;
+  const { bars, earliestYear, total, startYear, presentYear } = stats;
   const darkSample = recencyBarFill(presentYear, startYear, presentYear);
   const lightSample = recencyBarFill(startYear, startYear, presentYear);
 
@@ -76,12 +63,7 @@ export function SourceRecencyCard({ stats }: SourceRecencyCardProps) {
   return (
     <ProjectStatCard
       title="SOURCE RECENCY"
-      subtitle={`${sinceCount} source${sinceCount === 1 ? "" : "s"} from ${sinceYear} onwards`}
-      badge={
-        <span className="rounded-full bg-metrics-bg px-2 py-0.5 text-xs font-medium text-metrics">
-          {sinceCount} since {sinceYear}
-        </span>
-      }
+      subtitle={`${total} source${total === 1 ? "" : "s"} since ${earliestYear}`}
     >
       <ResponsiveContainer width="100%" height={112}>
         <BarChart data={bars} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -127,7 +109,7 @@ export function SourceRecencyCard({ stats }: SourceRecencyCardProps) {
             className="inline-block h-2 w-2 rounded-full"
             style={{ background: darkSample }}
           />
-          Last 3 years
+          Most recent
         </span>
         <span className="flex items-center gap-1.5">
           <span

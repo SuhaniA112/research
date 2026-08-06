@@ -1,5 +1,7 @@
 import { getProjectSync, listProjectsSync } from "@/api/projects";
+import { cacheSource } from "@/api/mappers";
 import { getSourceSync } from "@/api/sources";
+import type { Source } from "@/types";
 
 export interface SourceBreadcrumbItem {
   label: string;
@@ -8,6 +10,8 @@ export interface SourceBreadcrumbItem {
 
 export interface SourceNavigationState {
   breadcrumbs: SourceBreadcrumbItem[];
+  /** Full source payload so detail pages work before/without DB persistence. */
+  source?: Source;
 }
 
 export type SourceReferrer =
@@ -15,15 +19,19 @@ export type SourceReferrer =
   | { type: "saved-sources"; projectId: string }
   | { type: "mind-map"; projectId: string }
   | { type: "project-overview"; projectId: string }
-  | { type: "hub" }
+  | { type: "hub"; projectId?: string }
   | { type: "continue"; projectId: string; breadcrumbs: SourceBreadcrumbItem[] };
 
-export function getSourcePagePath(sourceId: string, projectId?: string): string {
-  const resolvedProjectId = projectId ?? listProjectsSync()[0]?.id ?? "1";
-  return `/projects/${resolvedProjectId}/sources/${sourceId}`;
+export function encodeSourceId(sourceId: string): string {
+  return encodeURIComponent(sourceId);
 }
 
-export function buildSourceBreadcrumbs(referrer: SourceReferrer): SourceBreadcrumbItem[] {
+function getSourcePagePath(sourceId: string, projectId?: string): string {
+  const resolvedProjectId = projectId ?? listProjectsSync()[0]?.id ?? "hub";
+  return `/projects/${resolvedProjectId}/sources/${encodeSourceId(sourceId)}`;
+}
+
+function buildSourceBreadcrumbs(referrer: SourceReferrer): SourceBreadcrumbItem[] {
   switch (referrer.type) {
     case "continue":
       return referrer.breadcrumbs;
@@ -62,17 +70,25 @@ export function buildSourceBreadcrumbs(referrer: SourceReferrer): SourceBreadcru
 export function getSourcePageLink(
   sourceId: string,
   referrer: SourceReferrer,
+  source?: Source,
 ): { to: string; state: SourceNavigationState } {
   const projectId =
     referrer.type === "hub"
-      ? (listProjectsSync()[0]?.id ?? "1")
+      ? (referrer.projectId ?? listProjectsSync()[0]?.id ?? "hub")
       : referrer.type === "continue"
         ? referrer.projectId
         : referrer.projectId;
 
+  if (source) {
+    cacheSource(source);
+  }
+
   return {
     to: getSourcePagePath(sourceId, projectId),
-    state: { breadcrumbs: buildSourceBreadcrumbs(referrer) },
+    state: {
+      breadcrumbs: buildSourceBreadcrumbs(referrer),
+      source,
+    },
   };
 }
 

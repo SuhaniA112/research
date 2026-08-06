@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import { getProfile, getResearchAreaOptions, updateProfile } from "@/api/profile";
 import { SelectionCard, StatCard } from "@/components/ui/StatCard";
+import { ResearchAreaPicker } from "@/components/ui/ResearchAreaPicker";
 import { Tag } from "@/components/ui/Tag";
 import { Toggle } from "@/components/ui/Toggle";
 import { InputField } from "@/components/ui/InputField";
@@ -44,12 +45,6 @@ export function ProfilePage() {
     });
     void getResearchAreaOptions().then(setAllResearchAreas);
   }, []);
-
-  function toggleArea(area: string) {
-    setAreas((prev) =>
-      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area],
-    );
-  }
 
   async function handleSave() {
     setSaving(true);
@@ -134,14 +129,11 @@ export function ProfilePage() {
 
       <section className="mt-8">
         <p className="text-sm font-medium text-gray-900">Research Area(s)</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {allResearchAreas.map((area) => (
-            <button key={area} type="button" onClick={() => toggleArea(area)}>
-              <Tag variant={areas.includes(area) ? "brand" : "outline"}>{area}</Tag>
-            </button>
-          ))}
-          <Tag variant="outline">Add Topic +</Tag>
-        </div>
+        <ResearchAreaPicker
+          options={allResearchAreas}
+          selected={areas}
+          onChange={setAreas}
+        />
 
         <p className="mt-4 text-sm font-medium text-gray-900">Specific Keywords</p>
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-300 px-3 py-2">

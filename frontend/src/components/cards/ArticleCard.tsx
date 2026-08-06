@@ -34,9 +34,10 @@ export function SavedSourceCard({
   const sourceLink = getSourcePageLink(
     source.id,
     sourceReferrer ?? { type: "saved-sources", projectId },
+    source,
   );
   const cardSummary = truncateWords(source.description, 50);
-  const [notes, setNotes] = useState<SourceNote[]>(source.notes ?? []);
+  const [notes, setNotes] = useState<SourceNote[]>([]);
 
   useEffect(() => {
     let cancelled = false;

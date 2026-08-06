@@ -26,7 +26,7 @@ export function SourcePreviewCard({
     (projectId
       ? { type: "project-overview" as const, projectId }
       : { type: "hub" as const });
-  const sourceLink = getSourcePageLink(source.id, referrer);
+  const sourceLink = getSourcePageLink(source.id, referrer, source);
   const showKeyFindings = variant === "featured";
   const cardSummary = truncateWords(source.description, 50);
 
