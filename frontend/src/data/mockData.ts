@@ -38,6 +38,8 @@ export const projects: Project[] = [
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
     topics: ["HCI", "AI/ML"],
+    keywords: ["accessibility", "LLM"],
+    readingLevel: "graduate",
     sourceCount: 24,
     updatedDaysAgo: 2,
     starred: true,
@@ -48,6 +50,8 @@ export const projects: Project[] = [
     description:
       "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
     topics: ["AI/ML", "NLP"],
+    keywords: ["evaluation", "benchmarks"],
+    readingLevel: "expert",
     sourceCount: 18,
     updatedDaysAgo: 5,
     starred: false,
@@ -58,6 +62,8 @@ export const projects: Project[] = [
     description:
       "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
     topics: ["Assistive Tech"],
+    keywords: ["robotics"],
+    readingLevel: "casual",
     sourceCount: 12,
     updatedDaysAgo: 7,
     starred: true,
@@ -68,6 +74,8 @@ export const projects: Project[] = [
     description:
       "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
     topics: ["AI/ML", "Vision"],
+    keywords: ["multimodal", "vision"],
+    readingLevel: "graduate",
     sourceCount: 31,
     updatedDaysAgo: 1,
     starred: false,

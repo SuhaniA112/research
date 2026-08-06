@@ -18,35 +18,80 @@ interface StarredContextValue {
 }
 
 const StarredContext = createContext<StarredContextValue | null>(null);
+const STARRED_STORAGE_KEY = "papersearcher_starred";
+
+interface StarredStore {
+  projects: Record<string, boolean>;
+  sources: Record<string, boolean>;
+}
 
 function buildInitialStarred<T extends { id: string; starred?: boolean }>(items: T[]) {
   return Object.fromEntries(items.map((item) => [item.id, item.starred ?? false]));
 }
 
+function loadStarred(): StarredStore {
+  const fromMocks: StarredStore = {
+    projects: buildInitialStarred(listProjectsSync()),
+    sources: buildInitialStarred(listSourcesSync()),
+  };
+  try {
+    const raw = localStorage.getItem(STARRED_STORAGE_KEY);
+    if (!raw) return fromMocks;
+    const parsed = JSON.parse(raw) as Partial<StarredStore>;
+    return {
+      projects: {
+        ...fromMocks.projects,
+        ...(parsed.projects && typeof parsed.projects === "object"
+          ? parsed.projects
+          : {}),
+      },
+      sources: {
+        ...fromMocks.sources,
+        ...(parsed.sources && typeof parsed.sources === "object" ? parsed.sources : {}),
+      },
+    };
+  } catch {
+    return fromMocks;
+  }
+}
+
+function persistStarred(store: StarredStore): void {
+  localStorage.setItem(STARRED_STORAGE_KEY, JSON.stringify(store));
+}
+
 export function StarredProvider({ children }: { children: ReactNode }) {
-  const [starredProjects, setStarredProjects] = useState<Record<string, boolean>>(() =>
-    buildInitialStarred(listProjectsSync()),
-  );
-  const [starredSources, setStarredSources] = useState<Record<string, boolean>>(() =>
-    buildInitialStarred(listSourcesSync()),
-  );
+  const [store, setStore] = useState<StarredStore>(() => loadStarred());
 
   const isProjectStarred = useCallback(
-    (id: string) => starredProjects[id] ?? false,
-    [starredProjects],
+    (id: string) => store.projects[id] ?? false,
+    [store.projects],
   );
 
   const isSourceStarred = useCallback(
-    (id: string) => starredSources[id] ?? false,
-    [starredSources],
+    (id: string) => store.sources[id] ?? false,
+    [store.sources],
   );
 
   const toggleProjectStar = useCallback((id: string) => {
-    setStarredProjects((prev) => ({ ...prev, [id]: !prev[id] }));
+    setStore((prev) => {
+      const next: StarredStore = {
+        ...prev,
+        projects: { ...prev.projects, [id]: !prev.projects[id] },
+      };
+      persistStarred(next);
+      return next;
+    });
   }, []);
 
   const toggleSourceStar = useCallback((id: string) => {
-    setStarredSources((prev) => ({ ...prev, [id]: !prev[id] }));
+    setStore((prev) => {
+      const next: StarredStore = {
+        ...prev,
+        sources: { ...prev.sources, [id]: !prev.sources[id] },
+      };
+      persistStarred(next);
+      return next;
+    });
   }, []);
 
   const value = useMemo(

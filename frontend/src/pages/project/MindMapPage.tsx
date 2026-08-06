@@ -1,8 +1,9 @@
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getMindMap } from "@/api/mindMap";
+import { getMindMapNote, setMindMapNote } from "@/api/notes";
 import { listSavedSources } from "@/api/sources";
 import { SourceListItem } from "@/components/cards/SourceListItem";
 import { ProjectLayoutHeader } from "@/components/layout/ProjectLayoutHeader";
@@ -83,6 +84,8 @@ export function MindMapPage() {
   const [sources, setSources] = useState<Source[]>([]);
   const [selectedNode, setSelectedNode] = useState<MindMapNode | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nodeNote, setNodeNote] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   useEffect(() => {
     if (!projectId) {
@@ -107,6 +110,30 @@ export function MindMapPage() {
       cancelled = true;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !selectedNode) {
+      setNodeNote("");
+      return;
+    }
+    let cancelled = false;
+    void getMindMapNote(projectId, selectedNode.id).then((text) => {
+      if (!cancelled) setNodeNote(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, selectedNode?.id]);
+
+  async function persistNodeNote(text: string) {
+    if (!projectId || !selectedNode) return;
+    setNoteSaving(true);
+    try {
+      await setMindMapNote(projectId, selectedNode.id, text);
+    } finally {
+      setNoteSaving(false);
+    }
+  }
 
   const depthMap = useMemo(() => buildDepthMap(mindMapEdges), [mindMapEdges]);
   const nodeRadii = useMemo(
@@ -308,22 +335,25 @@ export function MindMapPage() {
           <section>
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold tracking-wide text-gray-500">NOTES</p>
-              <IconButton size="md" title="Add note" aria-label="Add note">
-                <Plus className={getIconSizeClass("md")} />
-              </IconButton>
+              <span className="text-xs text-gray-400">
+                {noteSaving ? "Saving…" : "Saved automatically"}
+              </span>
             </div>
             <div className="relative mt-2 rounded-lg bg-surface-muted p-4">
               <textarea
                 placeholder={`Notes about ${selectedNode.label}…`}
                 className="w-full resize-none border-0 bg-transparent text-sm outline-none"
                 rows={3}
-                key={selectedNode.id}
+                value={nodeNote}
+                onChange={(e) => setNodeNote(e.target.value)}
+                onBlur={() => void persistNodeNote(nodeNote)}
               />
               <IconButton
                 size="sm"
                 className="absolute bottom-1 right-1 text-gray-400 hover:bg-transparent hover:text-gray-600"
-                title="Edit note"
-                aria-label="Edit note"
+                title="Save note"
+                aria-label="Save note"
+                onClick={() => void persistNodeNote(nodeNote)}
               >
                 <Pencil className={getIconSizeClass("sm")} />
               </IconButton>

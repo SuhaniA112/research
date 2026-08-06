@@ -5,6 +5,7 @@ import { SourceActions } from "@/components/source/SourceActions";
 import { SourceMetricsPanel } from "@/components/source/SourceMetricsPanel";
 import { Tag } from "@/components/ui/Tag";
 import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
+import { truncateWords } from "@/lib/text";
 import type { Source } from "@/types";
 
 interface SourcePreviewCardProps {
@@ -27,6 +28,7 @@ export function SourcePreviewCard({
       : { type: "hub" as const });
   const sourceLink = getSourcePageLink(source.id, referrer);
   const showKeyFindings = variant === "featured";
+  const cardSummary = truncateWords(source.description, 50);
 
   if (variant === "compact") {
     return (
@@ -43,7 +45,9 @@ export function SourcePreviewCard({
           <h3 className="mt-2 font-semibold text-gray-900 group-hover:text-brand-700">
             {source.title}
           </h3>
-          <p className="mt-2 line-clamp-3 text-sm text-gray-600">{source.description}</p>
+          {cardSummary ? (
+            <p className="mt-2 text-sm text-gray-600">{cardSummary}</p>
+          ) : null}
           <div className="mt-auto flex gap-2 pt-4">
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
               {source.relevance == null ? "[X]% RELEVANT" : `${source.relevance}% RELEVANT`}
@@ -81,12 +85,16 @@ export function SourcePreviewCard({
             {source.title}
           </h3>
 
-          <p className="mt-2 text-sm leading-relaxed text-gray-600">{source.description}</p>
+          {cardSummary ? (
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">{cardSummary}</p>
+          ) : null}
 
-          <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
-            <Sparkles className="h-3.5 w-3.5" />
-            AI Generated Description
-          </span>
+          {cardSummary ? (
+            <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI Generated Description
+            </span>
+          ) : null}
 
           {showKeyFindings && (
             <div className="mt-4 rounded-lg border border-gray-200 bg-surface-muted p-4">

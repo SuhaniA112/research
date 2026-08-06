@@ -1,5 +1,6 @@
 /**
  * Backend:
+ * GET    /api/v1/papers/:paperId
  * GET    /api/v1/projects/:projectId/papers
  * POST   /api/v1/projects/:projectId/papers  { paper: IndPaper }
  * DELETE /api/v1/projects/:projectId/papers/:paperId
@@ -28,8 +29,14 @@ export async function getSource(sourceId: string): Promise<Source | undefined> {
   if (env.useMocks) {
     return mockStore.sources.find((s) => s.id === sourceId);
   }
-  // Soft empty when not in session cache (no GET /papers/:id yet)
-  return getCachedSource(sourceId);
+  const cached = getCachedSource(sourceId);
+  if (cached) return cached;
+  try {
+    const { data } = await apiClient.get<BackendPaper>(`/api/v1/papers/${sourceId}`);
+    return mapBackendPaperToSource(data);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function listSavedSources(projectId: string): Promise<Source[]> {
@@ -122,14 +129,13 @@ export async function getSummary(
   sourceId: string,
   level: SummaryLevel,
 ): Promise<string> {
-  if (env.useMocks) {
-    void sourceId;
-    return mockStore.summaryTexts[level] ?? "";
-  }
-  // Soft empty — no summary endpoint yet
-  void sourceId;
+  // No leveled summary API yet — cards and source page share source.description.
+  // `level` reserved for when General/Graduate/Expert summaries exist.
   void level;
-  return "";
+  const source = env.useMocks
+    ? mockStore.sources.find((s) => s.id === sourceId)
+    : (getCachedSource(sourceId) ?? (await getSource(sourceId)));
+  return source?.description?.trim() ?? "";
 }
 
 export async function listRelatedSources(

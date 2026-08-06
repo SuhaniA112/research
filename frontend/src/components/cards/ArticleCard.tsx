@@ -1,6 +1,8 @@
 import { Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { listSourceNotes, type SourceNote } from "@/api/notes";
 import { SourceActions } from "@/components/source/SourceActions";
 import {
   getIconSizeClass,
@@ -10,6 +12,7 @@ import {
 import { StarButton } from "@/components/ui/StarButton";
 import { Tag } from "@/components/ui/Tag";
 import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
+import { truncateWords } from "@/lib/text";
 import { useStarred } from "@/providers/StarredProvider";
 import type { Source } from "@/types";
 
@@ -17,12 +20,14 @@ interface SavedSourceCardProps {
   source: Source;
   projectId: string;
   sourceReferrer?: SourceReferrer;
+  onRemove?: (sourceId: string) => void;
 }
 
 export function SavedSourceCard({
   source,
   projectId,
   sourceReferrer,
+  onRemove,
 }: SavedSourceCardProps) {
   const { isSourceStarred, toggleSourceStar } = useStarred();
   const starred = isSourceStarred(source.id);
@@ -30,6 +35,18 @@ export function SavedSourceCard({
     source.id,
     sourceReferrer ?? { type: "saved-sources", projectId },
   );
+  const cardSummary = truncateWords(source.description, 50);
+  const [notes, setNotes] = useState<SourceNote[]>(source.notes ?? []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listSourceNotes(source.id).then((next) => {
+      if (!cancelled) setNotes(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [source.id]);
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md">
@@ -49,7 +66,9 @@ export function SavedSourceCard({
           </div>
 
           <h3 className="mt-2 text-base font-semibold text-gray-900">{source.title}</h3>
-          <p className="mt-2 text-sm leading-relaxed text-gray-600">{source.description}</p>
+          {cardSummary ? (
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">{cardSummary}</p>
+          ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
@@ -68,11 +87,13 @@ export function SavedSourceCard({
             <div>
               <p className="text-xs font-semibold tracking-wide text-gray-500">NOTES</p>
               <div className="mt-2 space-y-2">
-                {(source.notes ?? []).length > 0 ? (
-                  source.notes!.map((note) => (
+                {notes.length > 0 ? (
+                  notes.slice(0, 3).map((note) => (
                     <div key={note.id} className="rounded-lg bg-surface-muted p-3 text-sm">
-                      <p className="text-gray-700">{note.text}</p>
-                      <p className="mt-1 text-right text-xs text-gray-400">Written on {note.date}</p>
+                      <p className="text-gray-700">{truncateWords(note.text, 30)}</p>
+                      <p className="mt-1 text-left text-xs text-gray-400">
+                        Written on {note.date}
+                      </p>
                     </div>
                   ))
                 ) : (
@@ -91,9 +112,14 @@ export function SavedSourceCard({
         <IconButtonGroup className="ml-auto">
           <IconButton
             size="md"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove?.(source.id);
+            }}
             title="Remove from project"
             aria-label="Remove from project"
+            className="text-gray-400 hover:bg-red-50 hover:text-red-600"
           >
             <Trash2 className={getIconSizeClass("md")} />
           </IconButton>

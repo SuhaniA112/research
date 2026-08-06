@@ -32,6 +32,8 @@ export interface Project {
   name: string;
   description: string;
   topics: string[];
+  keywords: string[];
+  readingLevel: ReadingLevel;
   sourceCount: number;
   updatedDaysAgo: number;
   starred: boolean;

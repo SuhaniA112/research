@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Search, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -12,16 +11,16 @@ import {
   getSourceRecency,
   getSourceValidity,
   type SourceBreakdownItem,
-  type SourceRecencyItem,
+  type SourceRecencyStats,
   type SourceValidityStats,
 } from "@/api/stats";
 import { SourcePreviewCard } from "@/components/cards/SourcePreviewCard";
 import { ProjectLayoutHeader } from "@/components/layout/ProjectLayoutHeader";
 import { ProjectStatCard } from "@/components/stats/ProjectStatCard";
 import { SourceBreakdownCard } from "@/components/stats/SourceBreakdownCard";
+import { SourceRecencyCard } from "@/components/stats/SourceRecencyCard";
 import { getIconSizeClass, IconButton } from "@/components/ui/IconButton";
 import { getFindSourcesPath } from "@/lib/sourcePaths";
-import { colors } from "@/lib/theme";
 import type { Project, Source } from "@/types";
 
 export function ProjectOverviewPage() {
@@ -31,7 +30,7 @@ export function ProjectOverviewPage() {
   const [viewNext, setViewNext] = useState<Source[]>([]);
   const [searches, setSearches] = useState<string[]>([]);
   const [breakdown, setBreakdown] = useState<SourceBreakdownItem[]>([]);
-  const [recency, setRecency] = useState<SourceRecencyItem[]>([]);
+  const [recency, setRecency] = useState<SourceRecencyStats | null>(null);
   const [validity, setValidity] = useState<SourceValidityStats | null>(null);
 
   useEffect(() => {
@@ -136,36 +135,7 @@ export function ProjectOverviewPage() {
 
           <SourceBreakdownCard data={breakdown} />
 
-          <ProjectStatCard
-            title="SOURCE RECENCY"
-            subtitle={`${viewNext.length > 0 || project.sourceCount > 0 ? project.sourceCount || "—" : "—"} sources from 2020 onwards`}
-            badge={
-              <span className="rounded-full bg-metrics-bg px-2 py-0.5 text-xs font-medium text-metrics">
-                {typeof recency[0]?.count === "number" ? "18 since 2021" : "[X]% since 2021"}
-              </span>
-            }
-          >
-            {recency.length > 0 && typeof recency[0]?.count === "number" ? (
-              <ResponsiveContainer width="100%" height={100}>
-                <BarChart data={recency}>
-                  <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-                  <YAxis hide />
-                  <Bar dataKey="count" radius={[2, 2, 0, 0]}>
-                    {recency.map((entry) => (
-                      <Cell
-                        key={entry.year}
-                        fill={
-                          Number(entry.year) >= 2021 ? colors.brand.accent : colors.fg.muted
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="py-6 text-center text-2xl font-bold text-metrics">[X]%</p>
-            )}
-          </ProjectStatCard>
+          <SourceRecencyCard stats={recency} />
 
           <ProjectStatCard
             title="SOURCE VALIDITY"

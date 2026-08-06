@@ -10,7 +10,8 @@
     "dev:mock": "npm --prefix frontend run dev",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f postgres"
+    "db:logs": "docker compose logs -f postgres",
+    "e2e": "backend/.venv/bin/python scripts/e2e_save_ask.py"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

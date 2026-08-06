@@ -2,7 +2,7 @@
  * Backend today:
  * GET    /api/v1/projects
  * GET    /api/v1/projects/:id
- * POST   /api/v1/projects  { name, description? }
+ * POST   /api/v1/projects  { name, description?, topics, keywords?, reading_level? }
  * DELETE /api/v1/projects/:id
  */
 import {
@@ -34,6 +34,8 @@ interface BackendProject {
   updated_at: string;
   source_count?: number;
   topics?: string[];
+  keywords?: string[];
+  reading_level?: ReadingLevel;
 }
 
 function formatUpdatedDaysAgo(updatedAt: string): number {
@@ -48,6 +50,8 @@ function mapBackendProject(p: BackendProject): Project {
     name: p.name,
     description: p.description ?? "",
     topics: p.topics ?? [],
+    keywords: p.keywords ?? [],
+    readingLevel: p.reading_level ?? "graduate",
     sourceCount: p.source_count ?? 0,
     updatedDaysAgo: formatUpdatedDaysAgo(p.updated_at),
     starred: false,
@@ -99,6 +103,8 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
       name: input.name,
       description: input.description,
       topics: input.topics,
+      keywords: input.keywords,
+      readingLevel: input.readingLevel,
       sourceCount: 0,
       updatedDaysAgo: 0,
       starred: false,
@@ -110,6 +116,9 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
   const { data } = await apiClient.post<BackendProject>("/api/v1/projects", {
     name: input.name,
     description: input.description || null,
+    topics: input.topics,
+    keywords: input.keywords,
+    reading_level: input.readingLevel,
   });
   return mapBackendProject(data);
 }
@@ -136,6 +145,20 @@ export function useProjects(): UseQueryResult<Project[], Error> {
   return useQuery({
     queryKey: ["projects"],
     queryFn: listProjects,
+  });
+}
+
+export function useCreateProject(): UseMutationResult<
+  Project,
+  Error,
+  CreateProjectInput
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createProject,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
   });
 }
 

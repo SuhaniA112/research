@@ -1,6 +1,7 @@
 export * from "@/api/digest";
 export * from "@/api/mappers";
 export * from "@/api/mindMap";
+export * from "@/api/notes";
 export * from "@/api/profile";
 export * from "@/api/projects";
 export * from "@/api/research";

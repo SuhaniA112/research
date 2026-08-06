@@ -26,7 +26,7 @@ class ProjectService:
             return []
         ids = [project.id for project in projects]
         counts = await self.project_paper_repo.count_papers_by_project(ids)
-        topics = await self.project_paper_repo.topics_by_project(ids)
+        paper_topics = await self.project_paper_repo.topics_by_project(ids)
         return [
             ProjectResponse(
                 id=project.id,
@@ -35,7 +35,12 @@ class ProjectService:
                 created_at=project.created_at,
                 updated_at=project.updated_at,
                 source_count=counts.get(project.id, 0),
-                topics=topics.get(project.id, []),
+                # Prefer interest-profile topics; fall back to tags on saved papers.
+                topics=project.topics or paper_topics.get(project.id, []),
+                keywords=project.keywords or [],
+                reading_level=project.reading_level  # validated on create
+                if project.reading_level in ("casual", "graduate", "expert")
+                else "graduate",
             )
             for project in projects
         ]
@@ -56,7 +61,13 @@ class ProjectService:
         return await self._to_responses(projects)
 
     async def create_project(self, payload: ProjectCreate) -> ProjectResponse:
-        project = Project(name=payload.name, description=payload.description)
+        project = Project(
+            name=payload.name,
+            description=payload.description,
+            topics=list(payload.topics),
+            keywords=list(payload.keywords),
+            reading_level=payload.reading_level,
+        )
         created = await self.project_repo.create(project)
         return await self._to_response(created)
 

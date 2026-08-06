@@ -41,3 +41,9 @@ npm run dev:mock
 | `npm run db:logs` | Tail Postgres logs |
 | `npm run dev:api` | API only |
 | `npm run dev:web` | Vite only |
+
+### E2E (save → ask → unsave)
+
+1. Put real keys in `backend/.env`: `VOYAGE_API_KEY`, `OPENROUTER_API_KEY`
+2. `npm run dev` (or at least API + Postgres)
+3. `backend/.venv/bin/python scripts/e2e_save_ask.py`
