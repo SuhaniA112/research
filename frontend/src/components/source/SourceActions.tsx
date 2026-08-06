@@ -1,7 +1,10 @@
 import { Bookmark, Check, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { listProjects } from "@/api/projects";
+import { listSavedSources, saveSource, unsaveSource } from "@/api/sources";
 import {
   getIconSizeClass,
   IconButton,
@@ -9,8 +12,8 @@ import {
   IconLink,
   type IconControlSize,
 } from "@/components/ui/IconButton";
-import { projects } from "@/data/mockData";
 import { getPublicationUrl } from "@/lib/sourcePaths";
+import type { Project } from "@/types";
 
 interface SaveToProjectButtonProps {
   sourceId: string;
@@ -19,16 +22,34 @@ interface SaveToProjectButtonProps {
 }
 
 export function SaveToProjectButton({
-  sourceId: _sourceId,
+  sourceId,
   size = "md",
   className = "",
 }: SaveToProjectButtonProps) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [savedProjectIds, setSavedProjectIds] = useState<Set<string>>(() => new Set());
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
   const iconClass = getIconSizeClass(size);
   const hasSavedProjects = savedProjectIds.size > 0;
+
+  useEffect(() => {
+    void listProjects().then(async (nextProjects) => {
+      setProjects(nextProjects);
+      const savedIds = new Set<string>();
+      await Promise.all(
+        nextProjects.map(async (project) => {
+          const saved = await listSavedSources(project.id);
+          if (saved.some((s) => s.id === sourceId)) {
+            savedIds.add(project.id);
+          }
+        }),
+      );
+      setSavedProjectIds(savedIds);
+    });
+  }, [sourceId]);
 
   function updateMenuPosition() {
     if (!ref.current) return;
@@ -39,16 +60,22 @@ export function SaveToProjectButton({
     });
   }
 
-  function toggleProject(projectId: string) {
-    setSavedProjectIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
+  async function toggleProject(projectId: string) {
+    const isSaved = savedProjectIds.has(projectId);
+    if (isSaved) {
+      await unsaveSource(projectId, sourceId);
+      setSavedProjectIds((prev) => {
+        const next = new Set(prev);
         next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
+        return next;
+      });
+    } else {
+      await saveSource(projectId, sourceId);
+      setSavedProjectIds((prev) => new Set(prev).add(projectId));
+    }
+    await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    const refreshed = await listProjects();
+    setProjects(refreshed);
   }
 
   useEffect(() => {
@@ -104,7 +131,7 @@ export function SaveToProjectButton({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    toggleProject(project.id);
+                    void toggleProject(project.id);
                   }}
                   className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
                     isSaved ? "text-gray-900" : "text-gray-700"

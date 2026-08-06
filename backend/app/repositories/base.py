@@ -17,7 +17,7 @@ class BaseRepository(Generic[ModelT]):
     async def get_by_id(self, entity_id: UUID) -> ModelT | None:
         return await self.session.get(self.model, entity_id)
 
-    async def list_all(self, *, skip: int = 0, limit: int = 100) -> list[ModelT]:
+    async def list_all(self, *, skip: int = 0, limit: int = 100) -> list[ModelT]: 
         stmt = select(self.model).offset(skip).limit(limit)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

@@ -1,8 +1,10 @@
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.paper import Paper
 from app.models.project_paper import ProjectPaper
 
 
@@ -53,3 +55,48 @@ class ProjectPaperRepository:
         await self.session.delete(existing)
         await self.session.flush()
         return True
+
+    async def list_papers_for_project(self, project_id: UUID) -> list[Paper]:
+        stmt = (
+            select(Paper)
+            .join(ProjectPaper, ProjectPaper.paper_id == Paper.id)
+            .where(ProjectPaper.project_id == project_id)
+            .order_by(ProjectPaper.saved_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def count_papers_by_project(
+        self, project_ids: list[UUID] | None = None
+    ) -> dict[UUID, int]:
+        stmt = select(ProjectPaper.project_id, func.count()).group_by(
+            ProjectPaper.project_id
+        )
+        if project_ids is not None:
+            if not project_ids:
+                return {}
+            stmt = stmt.where(ProjectPaper.project_id.in_(project_ids))
+        result = await self.session.execute(stmt)
+        return {project_id: int(count) for project_id, count in result.all()}
+
+    async def topics_by_project(
+        self, project_ids: list[UUID] | None = None
+    ) -> dict[UUID, list[str]]:
+        stmt = (
+            select(ProjectPaper.project_id, Paper.topics)
+            .join(Paper, Paper.id == ProjectPaper.paper_id)
+            .where(Paper.topics.is_not(None))
+        )
+        if project_ids is not None:
+            if not project_ids:
+                return {}
+            stmt = stmt.where(ProjectPaper.project_id.in_(project_ids))
+        result = await self.session.execute(stmt)
+
+        topics_map: dict[UUID, list[str]] = {}
+        for project_id, topics in result.all():
+            bucket = topics_map.setdefault(project_id, [])
+            for topic in topics or []:
+                if topic and topic not in bucket:
+                    bucket.append(topic)
+        return topics_map

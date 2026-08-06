@@ -1,15 +1,17 @@
 import { BookOpen, GraduationCap, Microscope } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useCreateProject } from "@/api/projects";
+import { getResearchAreaOptions } from "@/api/profile";
 import { SelectionCard } from "@/components/ui/StatCard";
 import { Tag } from "@/components/ui/Tag";
 import { InputField } from "@/components/ui/InputField";
-import { allResearchAreas } from "@/data/mockData";
 import type { ReadingLevel } from "@/types";
 
 export function NewProjectPage() {
   const navigate = useNavigate();
+  const createProject = useCreateProject();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -17,6 +19,12 @@ export function NewProjectPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>("graduate");
+  const [allResearchAreas, setAllResearchAreas] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getResearchAreaOptions().then(setAllResearchAreas);
+  }, []);
 
   const isValid = name.trim().length > 0 && areas.length > 0;
 
@@ -41,9 +49,21 @@ export function NewProjectPage() {
     }
   }
 
-  function handleCreate() {
-    if (!isValid) return;
-    navigate("/projects");
+  async function handleCreate() {
+    if (!isValid || createProject.isPending) return;
+    setError(null);
+    try {
+      const project = await createProject.mutateAsync({
+        name: name.trim(),
+        description,
+        topics: areas,
+        keywords,
+        readingLevel,
+      });
+      navigate(`/projects/${project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
+    }
   }
 
   return (
@@ -142,17 +162,23 @@ export function NewProjectPage() {
         </div>
       </section>
 
+      {error ? (
+        <p className="mt-6 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <div className="mt-10 flex items-center justify-between border-t border-gray-200 pt-6">
         <Link to="/projects" className="text-sm font-medium text-gray-500 hover:text-gray-700">
           Cancel
         </Link>
         <button
           type="button"
-          onClick={handleCreate}
-          disabled={!isValid}
+          onClick={() => void handleCreate()}
+          disabled={!isValid || createProject.isPending}
           className="rounded-lg px-5 py-2 text-sm font-medium text-white transition-colors enabled:bg-brand-700 enabled:hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          Create Project →
+          {createProject.isPending ? "Creating…" : "Create Project →"}
         </button>
       </div>
     </div>

@@ -8,11 +8,14 @@ import {
   Plus,
   Search,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { getProfile } from "@/api/profile";
+import { useProjects } from "@/api/projects";
+import { useProjectSearchHistory } from "@/api/research";
 import { env } from "@/config/env";
-import { currentUser, projects, recentProjectSearches } from "@/data/mockData";
 import { getFindSourcesPath } from "@/lib/sourcePaths";
+import type { UserProfile } from "@/types";
 
 const exploreLinks = [
   { to: "/hub", label: "Hub", icon: Home },
@@ -27,6 +30,16 @@ const sidebarShell =
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedProject, setExpandedProject] = useState("4");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { data: projects = [] } = useProjects();
+  const { data: projectSearches = {} } = useProjectSearchHistory();
+
+  useEffect(() => {
+    void getProfile().then(setProfile);
+  }, []);
+
+  const displayName = profile?.name?.[0] ?? "?";
+  const fullName = profile?.fullName ?? "";
 
   if (collapsed) {
     return (
@@ -55,7 +68,7 @@ export function Sidebar() {
         <div className="mt-auto">
           <NavLink to="/profile" className="block rounded-full bg-brand-700 p-2">
             <span className="flex h-6 w-6 items-center justify-center text-xs font-bold text-white">
-              {currentUser.name[0]}
+              {displayName}
             </span>
           </NavLink>
         </div>
@@ -107,7 +120,7 @@ export function Sidebar() {
           <div className="space-y-0.5">
             {projects.map((project) => {
               const isExpanded = expandedProject === project.id;
-              const searches = recentProjectSearches[project.id] ?? [];
+              const searches = projectSearches[project.id] ?? [];
               return (
                 <div key={project.id}>
                   <button
@@ -151,10 +164,10 @@ export function Sidebar() {
       <div className="shrink-0 border-t border-gray-200 p-4">
         <NavLink to="/profile" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white">
-            {currentUser.name[0]}
+            {displayName}
           </div>
           <span className="truncate text-sm font-medium text-gray-900">
-            {currentUser.fullName}
+            {fullName}
           </span>
         </NavLink>
       </div>

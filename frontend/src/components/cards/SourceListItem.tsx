@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 interface SourceListItemProps {
   title: string;
-  relevance?: number;
+  relevance?: number | null;
   projectId?: string;
   sourceId?: string;
   sourceReferrer?: SourceReferrer;
@@ -27,15 +27,19 @@ export function SourceListItem({
     <div className="relative flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50">
       {sourceLink && (
         <Link
-          to={sourceLink}
-          className="absolute inset-0 rounded-lg"
+          to={sourceLink.to}
+          state={sourceLink.state}
+          className="absolute inset-0 z-[1] rounded-lg"
           aria-label={`View ${title}`}
         />
       )}
-      <span className="relative z-0 min-w-0 truncate pr-3 text-sm text-gray-900">
+      <span className="relative z-0 min-w-0 truncate pr-3 text-sm text-gray-900 pointer-events-none">
         {title}
         {relevance !== undefined && (
-          <span className="text-gray-500"> • {relevance}% Relevant</span>
+          <span className="text-gray-500">
+            {" "}
+            • {relevance == null ? "[X]" : relevance}% Relevant
+          </span>
         )}
       </span>
       {sourceId && (

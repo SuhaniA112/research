@@ -2,15 +2,17 @@ import { Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useDeleteProject, useProjects } from "@/api/projects";
 import { ProjectCard } from "@/components/cards/ProjectCard";
 import { PillButton } from "@/components/ui/PillButton";
-import { projects } from "@/data/mockData";
 import { useStarred } from "@/providers/StarredProvider";
 
 export function AllProjectsPage() {
   const [filter, setFilter] = useState<"all" | "starred">("all");
   const [search, setSearch] = useState("");
   const { isProjectStarred } = useStarred();
+  const { data: projects = [], isLoading, error } = useProjects();
+  const deleteProject = useDeleteProject();
 
   const filtered = projects.filter((p) => {
     const matchesFilter = filter === "all" || isProjectStarred(p.id);
@@ -18,6 +20,18 @@ export function AllProjectsPage() {
       !search || p.name.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  if (isLoading) {
+    return <p className="text-sm text-gray-500">Loading projects…</p>;
+  }
+
+  if (error) {
+    return (
+      <p className="text-sm text-red-600">
+        {error instanceof Error ? error.message : "Failed to load projects"}
+      </p>
+    );
+  }
 
   return (
     <div>
@@ -54,9 +68,22 @@ export function AllProjectsPage() {
         </Link>
       </div>
 
+      {deleteProject.isError && (
+        <p className="mt-4 text-sm text-red-600">
+          {deleteProject.error instanceof Error
+            ? deleteProject.error.message
+            : "Failed to delete project"}
+        </p>
+      )}
+
       <div className="mt-8 grid grid-cols-2 gap-4">
         {filtered.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+          <ProjectCard
+            key={project.id}
+            project={project}
+            onDelete={(id) => deleteProject.mutate(id)}
+            deleting={deleteProject.isPending && deleteProject.variables === project.id}
+          />
         ))}
       </div>
     </div>

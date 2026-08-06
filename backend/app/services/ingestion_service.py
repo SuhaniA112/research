@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -53,7 +54,7 @@ class IngestionService:
             existing_chunk = await self.chunk_repo.get_for_paper(paper.id)
             should_index = existing_chunk is None
 
-        if should_index:
+        if should_index and self.voyage_client.api_key:
             prepared_chunks = await self.paper_indexer.prepare_chunks(
                 str(paper.id), paper_in
             )
@@ -69,11 +70,24 @@ class IngestionService:
         _, link_created = await self.project_paper_repo.create_if_absent(
             project_id, paper.id
         )
+        if link_created:
+            project.updated_at = datetime.now(timezone.utc)
+            await self.project_repo.update(project)
 
         return SavePaperResponse(
             paper=PaperResponse.model_validate(paper),
             already_saved=not link_created,
         )
+
+    async def list_papers_for_project(self, project_id: UUID) -> list[PaperResponse]:
+        project = await self.project_repo.get_by_id(project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project {project_id} not found",
+            )
+        papers = await self.project_paper_repo.list_papers_for_project(project_id)
+        return [PaperResponse.model_validate(paper) for paper in papers]
 
     async def unsave_paper_from_project(self, project_id: UUID, paper_id: UUID) -> bool:
         project = await self.project_repo.get_by_id(project_id)
@@ -82,4 +96,8 @@ class IngestionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project {project_id} not found",
             )
-        return await self.project_paper_repo.delete_if_present(project_id, paper_id)
+        deleted = await self.project_paper_repo.delete_if_present(project_id, paper_id)
+        if deleted:
+            project.updated_at = datetime.now(timezone.utc)
+            await self.project_repo.update(project)
+        return deleted

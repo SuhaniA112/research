@@ -1,7 +1,119 @@
 import { colors } from "@/lib/theme";
-import type { MindMapEdge, MindMapNode, Source } from "@/types";
+import type { MindMapEdge, MindMapNode, Project, Source } from "@/types";
 
 const ROOT_ID = "center";
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function placeOnCircle(
+  cx: number,
+  cy: number,
+  radius: number,
+  index: number,
+  total: number,
+  startAngle = -Math.PI / 2,
+): { x: number; y: number } {
+  const angle = startAngle + (2 * Math.PI * index) / Math.max(total, 1);
+  return {
+    x: clamp(cx + radius * Math.cos(angle), 8, 92),
+    y: clamp(cy + radius * Math.sin(angle), 8, 92),
+  };
+}
+
+function sourceHaystack(source: Source): string {
+  return `${source.title} ${source.topics.join(" ")} ${source.relevantTo.join(" ")}`.toLowerCase();
+}
+
+function sourcesForTopic(topic: string, sources: Source[]): Source[] {
+  const needle = topic.toLowerCase();
+  return sources.filter((source) => {
+    if (source.topics.some((t) => t.toLowerCase() === needle)) return true;
+    return sourceHaystack(source).includes(needle);
+  });
+}
+
+/** Build a mind map from project topics + saved papers when no backend map exists. */
+export function buildMindMapFromProject(
+  project: Pick<Project, "name" | "topics">,
+  sources: Source[],
+): { nodes: MindMapNode[]; edges: MindMapEdge[] } {
+  const nodes: MindMapNode[] = [
+    {
+      id: ROOT_ID,
+      label: project.name || "Project",
+      type: "project",
+      x: 50,
+      y: 50,
+    },
+  ];
+  const edges: MindMapEdge[] = [];
+
+  let topics = project.topics.map((t) => t.trim()).filter(Boolean);
+  if (topics.length === 0) {
+    const fromSources = new Set<string>();
+    for (const source of sources) {
+      for (const topic of source.topics) {
+        const trimmed = topic.trim();
+        if (trimmed) fromSources.add(trimmed);
+      }
+    }
+    topics = [...fromSources].slice(0, 8);
+  }
+
+  topics.forEach((topic, index) => {
+    const topicId = `t${index}`;
+    const pos = placeOnCircle(50, 50, 28, index, topics.length);
+    const matching = sourcesForTopic(topic, sources);
+
+    const subtopicLabels: string[] = [];
+    const seen = new Set<string>([topic.toLowerCase()]);
+    for (const source of matching) {
+      for (const tag of source.topics) {
+        const key = tag.trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        if (topics.some((t) => t.toLowerCase() === key)) continue;
+        seen.add(key);
+        subtopicLabels.push(tag.trim());
+        if (subtopicLabels.length >= 4) break;
+      }
+      if (subtopicLabels.length >= 4) break;
+    }
+
+    nodes.push({
+      id: topicId,
+      label: topic,
+      type: "topic",
+      x: pos.x,
+      y: pos.y,
+      sourcesSaved: matching.length,
+      subTopics: subtopicLabels.length,
+    });
+    edges.push({ from: ROOT_ID, to: topicId });
+
+    subtopicLabels.forEach((sub, subIndex) => {
+      const spread = (subIndex - (subtopicLabels.length - 1) / 2) * 0.55;
+      const baseAngle =
+        -Math.PI / 2 + (2 * Math.PI * index) / Math.max(topics.length, 1) + spread;
+      const subPos = {
+        x: clamp(pos.x + 14 * Math.cos(baseAngle), 6, 94),
+        y: clamp(pos.y + 14 * Math.sin(baseAngle), 6, 94),
+      };
+      const subId = `${topicId}-s${subIndex}`;
+      nodes.push({
+        id: subId,
+        label: sub,
+        type: "subtopic",
+        x: subPos.x,
+        y: subPos.y,
+      });
+      edges.push({ from: topicId, to: subId });
+    });
+  });
+
+  return { nodes, edges };
+}
 
 export function buildDepthMap(
   edges: MindMapEdge[],
@@ -77,7 +189,7 @@ export function getRelatedSources(node: MindMapNode, allSources: Source[]): Sour
   const terms = node.label.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
 
   const scored = allSources.map((source) => {
-    const haystack = `${source.title} ${source.relevantTo.join(" ")}`.toLowerCase();
+    const haystack = sourceHaystack(source);
     const matchScore = terms.reduce(
       (score, term) => (haystack.includes(term) ? score + 1 : score),
       0,
@@ -91,7 +203,8 @@ export function getRelatedSources(node: MindMapNode, allSources: Source[]): Sour
     .filter(({ matchScore }) => node.type === "project" || matchScore > 0)
     .sort(
       (a, b) =>
-        b.matchScore - a.matchScore || b.source.relevance - a.source.relevance,
+        b.matchScore - a.matchScore ||
+        (b.source.relevance ?? 0) - (a.source.relevance ?? 0),
     )
     .slice(0, limit)
     .map(({ source }) => source);

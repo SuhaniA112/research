@@ -1,13 +1,26 @@
+import { useEffect, useState } from "react";
+
+import { getHubDigest, type HubDigest } from "@/api/digest";
+import { getProfile } from "@/api/profile";
 import { SourcePreviewCard } from "@/components/cards/SourcePreviewCard";
-import { currentUser, sources } from "@/data/mockData";
+import type { UserProfile } from "@/types";
 
 export function HubPage() {
-  const topPick = sources[0]!;
-  const digestSources = sources.slice(1, 5);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [digest, setDigest] = useState<HubDigest | null>(null);
+
+  useEffect(() => {
+    void getProfile().then(setProfile);
+    void getHubDigest().then(setDigest);
+  }, []);
+
+  if (!profile || !digest) {
+    return <p className="text-sm text-gray-500">Loading…</p>;
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Welcome back {currentUser.name}!</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Welcome back {profile.name}!</h1>
       <p className="mt-1 text-sm text-gray-600">
         Here are the top 5 papers that matched your recent research!
       </p>
@@ -16,23 +29,37 @@ export function HubPage() {
         <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-500">
           TOP PICK THIS WEEK
         </h2>
-        <SourcePreviewCard source={topPick} sourceReferrer={{ type: "hub" }} variant="featured" />
+        {digest.topPick ? (
+          <SourcePreviewCard
+            source={digest.topPick}
+            sourceReferrer={{ type: "hub" }}
+            variant="featured"
+          />
+        ) : (
+          <p className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
+            No digest recommendations yet.
+          </p>
+        )}
       </section>
 
       <section className="mt-10">
         <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-500">
           MORE FROM YOUR DIGEST
         </h2>
-        <div className="grid grid-cols-2 gap-4">
-          {digestSources.map((source) => (
-            <SourcePreviewCard
-              key={source.id}
-              source={source}
-              sourceReferrer={{ type: "hub" }}
-              variant="compact"
-            />
-          ))}
-        </div>
+        {digest.items.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4">
+            {digest.items.map((source) => (
+              <SourcePreviewCard
+                key={source.id}
+                source={source}
+                sourceReferrer={{ type: "hub" }}
+                variant="compact"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No additional digest papers yet.</p>
+        )}
       </section>
     </div>
   );

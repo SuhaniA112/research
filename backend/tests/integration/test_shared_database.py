@@ -64,8 +64,12 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         PaperIndexer(),
     )
 
-    p1 = await project_repo.create(Project(name="User A Project"))
-    p2 = await project_repo.create(Project(name="User B Project"))
+    p1 = await project_repo.create(
+        Project(name="User A Project", topics=["AI/ML"], keywords=[], reading_level="graduate")
+    )
+    p2 = await project_repo.create(
+        Project(name="User B Project", topics=["HCI"], keywords=[], reading_level="graduate")
+    )
 
     ind = IndPaper(
         title="Shared Global Paper",
