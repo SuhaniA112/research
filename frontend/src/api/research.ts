@@ -6,11 +6,12 @@
  * (e.g. missing VOYAGE_API_KEY):
  * GET /api/v1/research/papers
  */
-import { mapBackendPaperToSource, type BackendPaper } from "@/api/mappers";
+import { mapBackendPaperToSource, cacheSources, type BackendPaper } from "@/api/mappers";
 import { mockStore } from "@/api/mocks/store";
 import { env } from "@/config/env";
 import { searchResearch } from "@/features/research/api/searchResearch";
 import { apiClient } from "@/lib/axios";
+import { listSavedSources, sourcesMatch } from "@/api/sources";
 import type { Source } from "@/types";
 import {
   useQuery,
@@ -175,6 +176,72 @@ export async function recordSearch(projectId: string, query: string): Promise<vo
 }
 
 const SEARCH_HISTORY_KEY = "papersearcher_search_history";
+const PROJECT_SEARCH_RESULTS_KEY = "papersearcher_project_search_results";
+const MAX_CACHED_RESULTS_PER_PROJECT = 40;
+
+function sourceKey(source: Pick<Source, "id" | "externalId">): string {
+  return source.externalId || source.id;
+}
+
+/** Remember papers returned by a project search for View Next recommendations. */
+export async function rememberProjectSearchResults(
+  projectId: string,
+  sources: Source[],
+): Promise<void> {
+  if (!projectId || sources.length === 0) return;
+  hydrateSearchResults();
+  const existing = mockStore.projectSearchResults[projectId] ?? [];
+  const merged: Source[] = [];
+  const seen = new Set<string>();
+  for (const source of [...sources, ...existing]) {
+    const key = sourceKey(source);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(source);
+    if (merged.length >= MAX_CACHED_RESULTS_PER_PROJECT) break;
+  }
+  mockStore.projectSearchResults[projectId] = merged;
+  cacheSources(merged);
+  persistSearchResults();
+}
+
+/**
+ * Unsaved papers from this project's past searches — used by View Next.
+ * Falls back to re-running the latest search query when the cache is empty.
+ */
+export async function getViewNextSources(
+  projectId: string,
+  limit = 2,
+): Promise<Source[]> {
+  hydrateSearchHistory();
+  hydrateSearchResults();
+
+  const [saved, searches] = await Promise.all([
+    listSavedSources(projectId).catch(() => [] as Source[]),
+    getRecentProjectSearches(projectId),
+  ]);
+
+  let pool = [...(mockStore.projectSearchResults[projectId] ?? [])];
+
+  if (pool.length === 0 && searches.length > 0) {
+    try {
+      pool = await searchSources(searches[0]!);
+      await rememberProjectSearchResults(projectId, pool);
+    } catch {
+      pool = [];
+    }
+  }
+
+  if (env.useMocks && pool.length === 0) {
+    pool = mockStore.sources.filter((s) => !s.savedOn);
+  }
+
+  cacheSources(pool);
+
+  return pool
+    .filter((source) => !saved.some((s) => sourcesMatch(s, source)))
+    .slice(0, limit);
+}
 
 function persistSearchHistory(): void {
   localStorage.setItem(
@@ -183,6 +250,13 @@ function persistSearchHistory(): void {
       recentSearches: mockStore.recentSearches,
       recentProjectSearches: mockStore.recentProjectSearches,
     }),
+  );
+}
+
+function persistSearchResults(): void {
+  localStorage.setItem(
+    PROJECT_SEARCH_RESULTS_KEY,
+    JSON.stringify(mockStore.projectSearchResults),
   );
 }
 
@@ -205,7 +279,25 @@ function hydrateSearchHistory(): void {
   }
 }
 
+function hydrateSearchResults(): void {
+  try {
+    const raw = localStorage.getItem(PROJECT_SEARCH_RESULTS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, Source[]>;
+    if (!parsed || typeof parsed !== "object") return;
+    mockStore.projectSearchResults = Object.fromEntries(
+      Object.entries(parsed).map(([id, list]) => [
+        id,
+        Array.isArray(list) ? list : [],
+      ]),
+    );
+  } catch {
+    // ignore corrupt local storage
+  }
+}
+
 hydrateSearchHistory();
+hydrateSearchResults();
 
 export async function listRecentSearches(): Promise<string[]> {
   hydrateSearchHistory();

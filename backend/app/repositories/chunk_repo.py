@@ -47,6 +47,15 @@ class ChunkRepository(BaseRepository[Chunk]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def list_for_paper(self, paper_id: UUID) -> list[Chunk]:
+        stmt = (
+            select(Chunk)
+            .where(Chunk.paper_id == paper_id)
+            .order_by(Chunk.chunk_index.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def ensure_chunk_for_paper(
         self,
         paper_id: UUID,

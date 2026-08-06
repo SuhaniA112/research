@@ -1,6 +1,12 @@
 export type SummaryLevel = "general" | "graduate" | "expert";
 export type ReadingLevel = "casual" | "graduate" | "expert";
 
+export interface SourceSummaries {
+  general?: string | null;
+  graduate?: string | null;
+  expert?: string | null;
+}
+
 export interface Source {
   id: string;
   title: string;
@@ -19,6 +25,8 @@ export interface Source {
   relevantTo: string[];
   similarTo: string[];
   keyFindings: { text: string; section: string }[];
+  /** Leveled AI summaries when available. */
+  summaries?: SourceSummaries;
   publicationUrl: string;
   externalId?: string;
   pdfUrl?: string | null;

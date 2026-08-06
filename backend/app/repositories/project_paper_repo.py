@@ -79,6 +79,12 @@ class ProjectPaperRepository:
         result = await self.session.execute(stmt)
         return {project_id: int(count) for project_id, count in result.all()}
 
+    async def count_distinct_papers(self) -> int:
+        result = await self.session.execute(
+            select(func.count(func.distinct(ProjectPaper.paper_id)))
+        )
+        return int(result.scalar_one())
+
     async def topics_by_project(
         self, project_ids: list[UUID] | None = None
     ) -> dict[UUID, list[str]]:

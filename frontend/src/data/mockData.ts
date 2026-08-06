@@ -117,6 +117,12 @@ export const summaryTexts: Record<string, string> = {
   expert: loremSummaryExpert,
 };
 
+const mockSummaries = {
+  general: loremSummary,
+  graduate: loremSummaryGraduate,
+  expert: loremSummaryExpert,
+};
+
 export const sources: Source[] = [
   {
     id: "s1",
@@ -139,6 +145,7 @@ export const sources: Source[] = [
       { text: "LLM-generated descriptions require human verification for accuracy", section: "Discussion" },
       { text: "Participants preferred voice-first interaction over touch-based alternatives", section: "User Study" },
     ],
+    summaries: { ...mockSummaries },
     publicationUrl: "https://dl.acm.org/doi/10.1145/3613904.3642134",
     starred: true,
     savedOn: "Mar 12, 2024",
@@ -163,6 +170,7 @@ export const sources: Source[] = [
       { text: "Retrieval-augmented generation reduces hallucination by 34%", section: "Experiments" },
       { text: "Domain-specific fine-tuning outperforms general models on citation tasks", section: "Results" },
     ],
+    summaries: { ...mockSummaries },
     publicationUrl: "https://papers.nips.cc/paper_files/paper/2023",
     starred: false,
     savedOn: "Feb 28, 2024",
@@ -187,6 +195,7 @@ export const sources: Source[] = [
       { text: "Force-feedback gloves improved precision by 28% in manipulation tasks", section: "Results" },
       { text: "Cost-effective actuator designs enable wider deployment", section: "Hardware" },
     ],
+    summaries: { ...mockSummaries },
     publicationUrl: "https://ieeexplore.ieee.org/document/10501234",
     starred: true,
     savedOn: "Apr 2, 2024",
@@ -211,6 +220,7 @@ export const sources: Source[] = [
       { text: "Cross-modal alignment remains the primary bottleneck", section: "Analysis" },
       { text: "Open-source models are closing the gap with proprietary systems", section: "Benchmarks" },
     ],
+    summaries: { ...mockSummaries },
     publicationUrl: "https://arxiv.org/abs/2401.14405",
     starred: false,
   },
@@ -233,6 +243,7 @@ export const sources: Source[] = [
     keyFindings: [
       { text: "Context-aware voice commands reduced navigation errors by 45%", section: "Evaluation" },
     ],
+    summaries: { ...mockSummaries },
     publicationUrl: "https://dl.acm.org/doi/10.1145/3586183.3606763",
     starred: false,
   },

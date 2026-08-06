@@ -30,6 +30,7 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 _EXPECTED_TABLES = {
     "users",
+    "profiles",
     "projects",
     "papers",
     "chunks",
@@ -116,7 +117,7 @@ def test_migration_clean_install_from_empty_database(test_database_url) -> None:
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0002_project_interest_profile"
+    assert version == "0004_app_profile"
 
     # alembic current should report head (no unfinished upgrade).
     command.current(cfg)
@@ -165,5 +166,5 @@ def test_migration_upgrade_from_existing_baseline_schema(test_database_url) -> N
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0002_project_interest_profile"
+    assert version == "0004_app_profile"
     command.current(cfg)

@@ -18,7 +18,7 @@ export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPane
 
   return (
     <div
-      className={`flex w-52 shrink-0 flex-col justify-between border-l border-gray-200 bg-surface-card p-5 ${className}`}
+      className={`flex h-full w-52 shrink-0 flex-col justify-between border-l border-gray-200 bg-surface-card p-5 ${className}`}
     >
       <div className="space-y-5">
         <div>

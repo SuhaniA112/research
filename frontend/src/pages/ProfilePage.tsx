@@ -4,11 +4,10 @@ import {
   GraduationCap,
   LogOut,
   Lock,
-  Save,
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getProfile, getResearchAreaOptions, updateProfile } from "@/api/profile";
 import { SelectionCard, StatCard } from "@/components/ui/StatCard";
@@ -18,6 +17,8 @@ import { Toggle } from "@/components/ui/Toggle";
 import { InputField } from "@/components/ui/InputField";
 import { clearAccessToken } from "@/lib/axios";
 import type { ReadingLevel, UserProfile } from "@/types";
+
+const AUTOSAVE_DEBOUNCE_MS = 450;
 
 export function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -30,7 +31,11 @@ export function ProfilePage() {
   const [institution, setInstitution] = useState("");
   const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [sourceNotifications, setSourceNotifications] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const hydrated = useRef(false);
+  const saveSeq = useRef(0);
 
   useEffect(() => {
     void getProfile().then((p) => {
@@ -42,27 +47,65 @@ export function ProfilePage() {
       setInstitution(p.institution);
       setWeeklyDigest(p.weeklyDigest);
       setSourceNotifications(p.sourceNotifications);
+      // Allow one paint with loaded values before autosave watches them.
+      requestAnimationFrame(() => {
+        hydrated.current = true;
+      });
     });
     void getResearchAreaOptions().then(setAllResearchAreas);
   }, []);
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const next = await updateProfile({
-        researchAreas: areas,
-        keywords,
-        readingLevel,
-        occupation,
-        institution,
-        weeklyDigest,
-        sourceNotifications,
-      });
-      setProfile(next);
-    } finally {
-      setSaving(false);
-    }
-  }
+  useEffect(() => {
+    if (!hydrated.current || !profile) return;
+
+    const patch = {
+      researchAreas: areas,
+      keywords,
+      readingLevel,
+      occupation,
+      institution,
+      weeklyDigest,
+      sourceNotifications,
+    };
+
+    const unchanged =
+      JSON.stringify(areas) === JSON.stringify(profile.researchAreas) &&
+      JSON.stringify(keywords) === JSON.stringify(profile.keywords) &&
+      readingLevel === profile.readingLevel &&
+      occupation === profile.occupation &&
+      institution === profile.institution &&
+      weeklyDigest === profile.weeklyDigest &&
+      sourceNotifications === profile.sourceNotifications;
+    if (unchanged) return;
+
+    const seq = ++saveSeq.current;
+    setSaveStatus("saving");
+    const timer = window.setTimeout(() => {
+      void updateProfile(patch)
+        .then((next) => {
+          if (seq !== saveSeq.current) return;
+          setProfile(next);
+          setSaveStatus("saved");
+        })
+        .catch(() => {
+          if (seq !== saveSeq.current) return;
+          setSaveStatus("error");
+        });
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    areas,
+    keywords,
+    readingLevel,
+    occupation,
+    institution,
+    weeklyDigest,
+    sourceNotifications,
+    profile,
+  ]);
 
   function handleSignOut() {
     clearAccessToken();
@@ -75,26 +118,26 @@ export function ProfilePage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Profile & Settings</h1>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
-          >
-            <Save className="h-4 w-4" />
-            Save changes
-          </button>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Profile & Settings</h1>
+          <p className="mt-1 text-xs text-gray-500">
+            {saveStatus === "saving"
+              ? "Saving…"
+              : saveStatus === "saved"
+                ? "All changes saved"
+                : saveStatus === "error"
+                  ? "Couldn’t save — try again"
+                  : "Changes save automatically"}
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
       </div>
 
       <div className="mt-8 flex items-center gap-4">
@@ -104,7 +147,7 @@ export function ProfilePage() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">{profile.fullName}</h2>
           <p className="text-sm text-gray-500">
-            {profile.occupation} · Member since {profile.memberSince}
+            {occupation || profile.occupation} · Member since {profile.memberSince}
           </p>
         </div>
       </div>

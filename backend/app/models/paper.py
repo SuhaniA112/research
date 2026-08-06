@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import ARRAY, Integer, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -29,6 +29,12 @@ class Paper(Base, TimestampMixin):
     pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     topics: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list
+    )
+    summary_general: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_graduate: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_expert: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_findings: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
     )
 
     __table_args__ = (

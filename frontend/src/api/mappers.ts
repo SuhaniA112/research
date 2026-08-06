@@ -1,4 +1,5 @@
 import type { Source } from "@/types";
+import { decodeHtmlEntities } from "@/lib/text";
 
 /** Backend paper shape shared by discovery + project-paper list/save. */
 export interface BackendPaper {
@@ -12,6 +13,10 @@ export interface BackendPaper {
   url?: string | null;
   pdf_url?: string | null;
   topics?: string[];
+  summary_general?: string | null;
+  summary_graduate?: string | null;
+  summary_expert?: string | null;
+  key_findings?: { text: string; section?: string }[];
   created_at?: string;
 }
 
@@ -41,16 +46,20 @@ export function mapBackendPaperToSource(
   extras?: Partial<Source>,
 ): Source {
   const savedOn = extras?.savedOn;
+  const keyFindings = (paper.key_findings ?? []).map((finding) => ({
+    text: decodeHtmlEntities(finding.text),
+    section: decodeHtmlEntities(finding.section ?? "Paper") || "Paper",
+  }));
   return cacheSource({
     id: paper.id,
-    title: paper.title,
+    title: decodeHtmlEntities(paper.title) || "Untitled",
     topics: paper.topics ?? [],
     source: paper.source,
     publishedMonth: "",
     publishedYear: paper.year ?? new Date().getFullYear(),
-    description: paper.abstract ?? "",
+    description: decodeHtmlEntities(paper.abstract ?? ""),
     authors: paper.authors ?? [],
-    // Soft metrics until scoring endpoints exist
+    // Soft metrics until scoring APIs exist
     relevance: null,
     similarity: null,
     citations: null,
@@ -58,7 +67,16 @@ export function mapBackendPaperToSource(
     citedBySaved: null,
     relevantTo: paper.topics ?? [],
     similarTo: [],
-    keyFindings: [],
+    keyFindings,
+    summaries: {
+      general: paper.summary_general
+        ? decodeHtmlEntities(paper.summary_general)
+        : null,
+      graduate: paper.summary_graduate
+        ? decodeHtmlEntities(paper.summary_graduate)
+        : null,
+      expert: paper.summary_expert ? decodeHtmlEntities(paper.summary_expert) : null,
+    },
     publicationUrl: paper.url ?? paper.pdf_url ?? "#",
     externalId: paper.external_id,
     pdfUrl: paper.pdf_url ?? null,

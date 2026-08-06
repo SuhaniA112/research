@@ -4,8 +4,12 @@ import { Search, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
-import { deleteProjectSearch, getRecentProjectSearches, useInvalidateSearchHistory } from "@/api/research";
-import { listSavedSources } from "@/api/sources";
+import {
+  deleteProjectSearch,
+  getRecentProjectSearches,
+  getViewNextSources,
+  useInvalidateSearchHistory,
+} from "@/api/research";
 import {
   getSourceBreakdown,
   getSourceRecency,
@@ -39,7 +43,7 @@ export function ProjectOverviewPage() {
       return;
     }
     void getProject(projectId).then((p) => setProject(p ?? null));
-    void listSavedSources(projectId).then((sources) => setViewNext(sources.slice(0, 2)));
+    void getViewNextSources(projectId, 2).then(setViewNext);
     void getRecentProjectSearches(projectId).then(setSearches);
     void getSourceBreakdown(projectId).then(setBreakdown);
     void getSourceRecency(projectId).then(setRecency);
@@ -75,15 +79,16 @@ export function ProjectOverviewPage() {
                 ))
               ) : (
                 <p className="text-sm text-gray-500">
-                  No saved sources yet. Find and save papers to see them here.
+                  No unread papers from your searches yet. Find sources to get
+                  recommendations here.
                 </p>
               )}
             </div>
             <Link
-              to={`/projects/${projectId}/saved`}
+              to={getFindSourcesPath(projectId!, searches[0])}
               className="mt-3 inline-block text-sm text-brand-700 hover:underline"
             >
-              See more of your sources →
+              Find more sources →
             </Link>
           </section>
 
@@ -100,27 +105,25 @@ export function ProjectOverviewPage() {
                   >
                     <Link
                       to={getFindSourcesPath(projectId!, search)}
-                      className="min-w-0 flex-1 truncate text-sm text-gray-700 hover:text-brand-700"
+                      className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm text-gray-700 hover:text-brand-700"
                     >
-                      {search}
+                      <span className="min-w-0 flex-1 truncate">{search}</span>
+                      <Search className="h-4 w-4 shrink-0 text-gray-400" />
                     </Link>
-                    <div className="ml-2 flex shrink-0 items-center gap-1">
-                      <Search className="h-4 w-4 text-gray-400" />
-                      <IconButton
-                        size="md"
-                        title="Delete search"
-                        aria-label={`Delete search ${search}`}
-                        onClick={() => {
-                          void deleteProjectSearch(projectId!, search).then(() => {
-                            setSearches((prev) => prev.filter((item) => item !== search));
-                            invalidateSearchHistory();
-                          });
-                        }}
-                        className="text-gray-400 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className={getIconSizeClass("md")} />
-                      </IconButton>
-                    </div>
+                    <IconButton
+                      size="md"
+                      title="Delete search"
+                      aria-label={`Delete search ${search}`}
+                      onClick={() => {
+                        void deleteProjectSearch(projectId!, search).then(() => {
+                          setSearches((prev) => prev.filter((item) => item !== search));
+                          invalidateSearchHistory();
+                        });
+                      }}
+                      className="ml-1 shrink-0 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className={getIconSizeClass("md")} />
+                    </IconButton>
                   </div>
                 ))
               ) : (

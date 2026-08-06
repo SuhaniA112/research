@@ -53,7 +53,10 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
     project_repo = ProjectRepository(db_session)
     project_paper_repo = ProjectPaperRepository(db_session)
     voyage = AsyncMock()
+    voyage.api_key = "test-key"
     voyage.embed.return_value = [_unit_vec(1)]
+    paper_summarizer = AsyncMock()
+    paper_summarizer.summarize.return_value = None
 
     ingestion = IngestionService(
         paper_repo,
@@ -62,6 +65,7 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         project_repo,
         voyage,
         PaperIndexer(),
+        paper_summarizer,
     )
 
     p1 = await project_repo.create(

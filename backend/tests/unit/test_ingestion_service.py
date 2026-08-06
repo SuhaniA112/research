@@ -26,6 +26,7 @@ def _paper(**kwargs) -> Paper:
         url="https://example.com/paper",
         pdf_url=None,
         topics=["retrieval"],
+        key_findings=[],
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -97,6 +98,11 @@ def _build_service(
     paper_indexer = AsyncMock()
     paper_indexer.prepare_chunks.return_value = chunks
 
+    chunk_repo.list_for_paper.return_value = []
+
+    paper_summarizer = AsyncMock()
+    paper_summarizer.summarize.return_value = None
+
     service = IngestionService(
         paper_repo,
         chunk_repo,
@@ -104,6 +110,7 @@ def _build_service(
         project_repo,
         voyage,
         paper_indexer,
+        paper_summarizer,
     )
     mocks = {
         "paper_repo": paper_repo,
@@ -112,6 +119,7 @@ def _build_service(
         "project_repo": project_repo,
         "voyage": voyage,
         "paper_indexer": paper_indexer,
+        "paper_summarizer": paper_summarizer,
         "project_id": project_id,
         "prepared_chunks": chunks,
     }
@@ -236,4 +244,28 @@ async def test_already_linked_paper_sets_already_saved_and_skips_reindex() -> No
         mocks["project_id"], paper.id
     )
     assert result.already_saved is True
+    assert result.paper.id == paper.id
+
+
+@pytest.mark.asyncio
+async def test_voyage_failure_still_links_paper_to_project() -> None:
+    paper = _paper()
+    prepared = _prepared_chunks(str(paper.id), count=1)
+    service, mocks = _build_service(
+        paper=paper,
+        paper_created=True,
+        link_created=True,
+        existing_chunk=None,
+        prepared_chunks=prepared,
+    )
+    mocks["voyage"].embed.side_effect = RuntimeError("voyage 403")
+    paper_in = _ind_paper()
+
+    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+
+    mocks["project_paper_repo"].create_if_absent.assert_awaited_once_with(
+        mocks["project_id"], paper.id
+    )
+    mocks["chunk_repo"].create_many_for_paper.assert_not_awaited()
+    assert result.already_saved is False
     assert result.paper.id == paper.id

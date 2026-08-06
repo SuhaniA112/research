@@ -80,22 +80,20 @@ export function RecentSearchesPage() {
             >
               <Link
                 to={getFindSourcesPath(defaultProjectId, search)}
-                className="min-w-0 flex-1 truncate text-sm text-gray-700 hover:text-brand-700"
+                className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm text-gray-700 hover:text-brand-700"
               >
-                {search}
+                <span className="min-w-0 flex-1 truncate">{search}</span>
+                <Search className="h-4 w-4 shrink-0 text-gray-400" />
               </Link>
-              <div className="ml-3 flex shrink-0 items-center gap-1">
-                <Search className="h-4 w-4 text-gray-400" />
-                <IconButton
-                  size="md"
-                  title="Delete search"
-                  aria-label={`Delete search ${search}`}
-                  onClick={() => void handleDelete(search)}
-                  className="text-gray-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className={getIconSizeClass("md")} />
-                </IconButton>
-              </div>
+              <IconButton
+                size="md"
+                title="Delete search"
+                aria-label={`Delete search ${search}`}
+                onClick={() => void handleDelete(search)}
+                className="ml-1 shrink-0 text-gray-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className={getIconSizeClass("md")} />
+              </IconButton>
             </div>
           ))
         )}

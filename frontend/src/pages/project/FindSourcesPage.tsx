@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
-import { recordSearch, searchSources, useInvalidateSearchHistory } from "@/api/research";
+import {
+  recordSearch,
+  rememberProjectSearchResults,
+  searchSources,
+  useInvalidateSearchHistory,
+} from "@/api/research";
 import { SourceCard } from "@/components/cards/SourceCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import {
@@ -91,6 +96,12 @@ export function FindSourcesPage() {
   const [yearTo, setYearTo] = useState(YEAR_MAX);
   const [sortBy, setSortBy] = useState<SourceSortOption>("relevance");
 
+  // Keep the search box in sync when navigating from Recent Searches / sidebar.
+  const queryFromUrl = searchParams.get("q") ?? "";
+  useEffect(() => {
+    setSearch(queryFromUrl);
+  }, [queryFromUrl]);
+
   useEffect(() => {
     if (!projectId) {
       setProject(null);
@@ -110,6 +121,9 @@ export function FindSourcesPage() {
           if (cancelled) return;
           setResults(sources);
           setVisibleCount(3);
+          if (search.trim()) {
+            void rememberProjectSearchResults(projectId, sources);
+          }
         })
         .catch((err: unknown) => {
           if (cancelled) return;

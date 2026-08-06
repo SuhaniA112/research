@@ -11,7 +11,10 @@ import {
 } from "@/components/ui/IconButton";
 import { StarButton } from "@/components/ui/StarButton";
 import { Tag } from "@/components/ui/Tag";
+import { useHydratedSource } from "@/hooks/useHydratedSource";
+import { useReadingLevel } from "@/hooks/useReadingLevel";
 import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
+import { summaryForReadingLevel } from "@/lib/summaries";
 import { truncateWords } from "@/lib/text";
 import { useStarred } from "@/providers/StarredProvider";
 import type { Source } from "@/types";
@@ -24,11 +27,12 @@ interface SavedSourceCardProps {
 }
 
 export function SavedSourceCard({
-  source,
+  source: sourceProp,
   projectId,
   sourceReferrer,
   onRemove,
 }: SavedSourceCardProps) {
+  const { source, summarizing } = useHydratedSource(sourceProp);
   const { isSourceStarred, toggleSourceStar } = useStarred();
   const starred = isSourceStarred(source.id);
   const sourceLink = getSourcePageLink(
@@ -36,7 +40,8 @@ export function SavedSourceCard({
     sourceReferrer ?? { type: "saved-sources", projectId },
     source,
   );
-  const cardSummary = truncateWords(source.description, 50);
+  const readingLevel = useReadingLevel();
+  const cardSummary = truncateWords(summaryForReadingLevel(source, readingLevel), 50);
   const [notes, setNotes] = useState<SourceNote[]>([]);
 
   useEffect(() => {
@@ -69,20 +74,28 @@ export function SavedSourceCard({
           <h3 className="mt-2 text-base font-semibold text-gray-900">{source.title}</h3>
           {cardSummary ? (
             <p className="mt-2 text-sm leading-relaxed text-gray-600">{cardSummary}</p>
+          ) : summarizing ? (
+            <p className="mt-2 text-sm text-gray-400">Generating summary…</p>
           ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-semibold tracking-wide text-gray-500">KEY FINDINGS</p>
               <div className="mt-2 rounded-lg border border-gray-200 bg-surface-muted p-3">
-                <ul className="space-y-2 text-sm text-gray-700">
-                  {source.keyFindings.map((finding) => (
-                    <li key={finding.text} className="list-inside list-disc">
-                      {finding.text}{" "}
-                      <span className="font-semibold">Found in {finding.section}</span>
-                    </li>
-                  ))}
-                </ul>
+                {source.keyFindings.length > 0 ? (
+                  <ul className="space-y-2 text-sm text-gray-700">
+                    {source.keyFindings.map((finding) => (
+                      <li key={finding.text} className="list-inside list-disc">
+                        {finding.text}{" "}
+                        <span className="font-semibold">Found in {finding.section}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    {summarizing ? "Extracting key findings…" : "No key findings yet"}
+                  </p>
+                )}
               </div>
             </div>
             <div>
@@ -124,7 +137,7 @@ export function SavedSourceCard({
           >
             <Trash2 className={getIconSizeClass("md")} />
           </IconButton>
-          <SourceActions sourceId={source.id} projectId={projectId} size="md" />
+          <SourceActions source={source} projectId={projectId} size="md" />
         </IconButtonGroup>
       </div>
     </div>

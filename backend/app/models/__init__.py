@@ -1,6 +1,7 @@
 from app.models.base import Base
 from app.models.chunk import Chunk
 from app.models.paper import Paper
+from app.models.profile import Profile
 from app.models.project import Project
 from app.models.project_paper import ProjectPaper
 from app.models.search_execution import SearchExecution
@@ -12,6 +13,7 @@ __all__ = [
     "Base",
     "Chunk",
     "Paper",
+    "Profile",
     "Project",
     "ProjectPaper",
     "SearchExecution",

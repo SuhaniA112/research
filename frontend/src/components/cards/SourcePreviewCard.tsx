@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 import { SourceActions } from "@/components/source/SourceActions";
 import { SourceMetricsPanel } from "@/components/source/SourceMetricsPanel";
 import { Tag } from "@/components/ui/Tag";
+import { useHydratedSource } from "@/hooks/useHydratedSource";
+import { useReadingLevel } from "@/hooks/useReadingLevel";
 import { getSourcePageLink, type SourceReferrer } from "@/lib/sourcePaths";
+import { readingLevelToSummaryLevel, summaryForReadingLevel } from "@/lib/summaries";
 import { truncateWords } from "@/lib/text";
 import type { Source } from "@/types";
 
@@ -16,19 +19,23 @@ interface SourcePreviewCardProps {
 }
 
 export function SourcePreviewCard({
-  source,
+  source: sourceProp,
   projectId,
   sourceReferrer,
   variant = "standard",
 }: SourcePreviewCardProps) {
+  const { source, summarizing } = useHydratedSource(sourceProp);
   const referrer =
     sourceReferrer ??
     (projectId
       ? { type: "project-overview" as const, projectId }
       : { type: "hub" as const });
   const sourceLink = getSourcePageLink(source.id, referrer, source);
+  const readingLevel = useReadingLevel();
   const showKeyFindings = variant === "featured";
-  const cardSummary = truncateWords(source.description, 50);
+  const summaryLevel = readingLevelToSummaryLevel(readingLevel);
+  const hasAiSummary = Boolean(source.summaries?.[summaryLevel]?.trim());
+  const cardSummary = truncateWords(summaryForReadingLevel(source, readingLevel), 50);
 
   if (variant === "compact") {
     return (
@@ -47,6 +54,8 @@ export function SourcePreviewCard({
           </h3>
           {cardSummary ? (
             <p className="mt-2 text-sm text-gray-600">{cardSummary}</p>
+          ) : summarizing ? (
+            <p className="mt-2 text-sm text-gray-400">Generating summary…</p>
           ) : null}
           <div className="mt-auto flex gap-2 pt-4">
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
@@ -58,7 +67,7 @@ export function SourcePreviewCard({
           </div>
         </Link>
         <div className="flex justify-end px-5 pb-5 pt-2">
-          <SourceActions sourceId={source.id} projectId={projectId} />
+          <SourceActions source={source} projectId={projectId} />
         </div>
       </div>
     );
@@ -87,13 +96,17 @@ export function SourcePreviewCard({
 
           {cardSummary ? (
             <p className="mt-2 text-sm leading-relaxed text-gray-600">{cardSummary}</p>
+          ) : summarizing ? (
+            <p className="mt-2 text-sm text-gray-400">Generating summary…</p>
           ) : null}
 
-          {cardSummary ? (
+          {hasAiSummary ? (
             <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
               <Sparkles className="h-3.5 w-3.5" />
               AI Generated Description
             </span>
+          ) : summarizing ? (
+            <span className="mt-3 text-xs text-gray-400">Generating AI summary…</span>
           ) : null}
 
           {showKeyFindings && (
@@ -108,19 +121,25 @@ export function SourcePreviewCard({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-gray-500">No key findings extracted yet.</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  {summarizing ? "Extracting key findings…" : "No key findings extracted yet."}
+                </p>
               )}
             </div>
           )}
         </Link>
 
         <div className="flex justify-end px-5 pb-5 pt-4">
-          <SourceActions sourceId={source.id} projectId={projectId} />
+          <SourceActions source={source} projectId={projectId} />
         </div>
       </div>
 
-      <Link to={sourceLink.to} state={sourceLink.state} className="shrink-0 hover:bg-gray-100/60">
-        <SourceMetricsPanel source={source} />
+      <Link
+        to={sourceLink.to}
+        state={sourceLink.state}
+        className="flex shrink-0 self-stretch hover:bg-gray-100/60"
+      >
+        <SourceMetricsPanel source={source} className="h-full min-h-full" />
       </Link>
     </div>
   );

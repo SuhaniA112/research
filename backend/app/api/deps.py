@@ -13,6 +13,7 @@ from app.repositories.project_repo import ProjectRepository
 from app.repositories.search_execution_repo import SearchExecutionRepository
 from app.repositories.search_topic_paper_repo import SearchTopicPaperRepository
 from app.repositories.search_topic_repo import SearchTopicRepository
+from app.repositories.profile_repo import ProfileRepository
 from app.repositories.user_repo import UserRepository
 from app.services.ask_service import AskService
 from app.services.discovery_search_service import DiscoverySearchService
@@ -20,8 +21,10 @@ from app.services.embeddings.voyage_client import VoyageEmbeddingClient
 from app.services.generation.openrouter_client import OpenRouterClient
 from app.services.ingestion_service import IngestionService
 from app.services.indexing.paper_indexer import PaperIndexer
+from app.services.profile_service import ProfileService
 from app.services.project_service import ProjectService
 from app.services.research_service import ResearchService
+from app.services.summarization.paper_summarizer import PaperSummarizer
 from app.services.user_service import UserService
 
 
@@ -50,6 +53,13 @@ def get_research_service() -> ResearchService:
 
 ResearchServiceDep = Annotated[ResearchService, Depends(get_research_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def get_profile_repository(session: DbSession) -> ProfileRepository:
+    return ProfileRepository(session)
+
+
+ProfileRepoDep = Annotated[ProfileRepository, Depends(get_profile_repository)]
 
 
 def get_project_repository(session: DbSession) -> ProjectRepository:
@@ -122,11 +132,29 @@ def get_project_service(
     return ProjectService(project_repo, project_paper_repo)
 
 
+def get_profile_service(
+    profile_repo: ProfileRepoDep,
+    project_repo: ProjectRepoDep,
+    project_paper_repo: ProjectPaperRepoDep,
+) -> ProfileService:
+    return ProfileService(profile_repo, project_repo, project_paper_repo)
+
+
+ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+
 def get_paper_indexer() -> PaperIndexer:
     return PaperIndexer()
 
 
 PaperIndexerDep = Annotated[PaperIndexer, Depends(get_paper_indexer)]
+
+
+def get_paper_summarizer(openrouter_client: OpenRouterClientDep) -> PaperSummarizer:
+    return PaperSummarizer(openrouter_client)
+
+
+PaperSummarizerDep = Annotated[PaperSummarizer, Depends(get_paper_summarizer)]
 
 
 def get_ingestion_service(
@@ -136,6 +164,7 @@ def get_ingestion_service(
     project_repo: ProjectRepoDep,
     voyage_client: VoyageClientDep,
     paper_indexer: PaperIndexerDep,
+    paper_summarizer: PaperSummarizerDep,
 ) -> IngestionService:
     return IngestionService(
         paper_repo,
@@ -144,6 +173,7 @@ def get_ingestion_service(
         project_repo,
         voyage_client,
         paper_indexer,
+        paper_summarizer,
     )
 
 

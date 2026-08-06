@@ -1,19 +1,24 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
-from app.api.deps import PaperRepoDep
-from app.schemas.paper import PaperResponse
+from app.api.deps import IngestionServiceDep
+from app.schemas.paper import PaperResponse, SavePaperRequest
 
 router = APIRouter()
 
 
+@router.post("/summarize", response_model=PaperResponse)
+async def summarize_paper(
+    payload: SavePaperRequest,
+    service: IngestionServiceDep,
+) -> PaperResponse:
+    """Upsert a paper and generate leveled summaries (no project save required)."""
+    return await service.upsert_and_summarize(payload.paper)
+
+
 @router.get("/{paper_id}", response_model=PaperResponse)
-async def get_paper(paper_id: UUID, paper_repo: PaperRepoDep) -> PaperResponse:
-    paper = await paper_repo.get_by_id(paper_id)
-    if paper is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Paper {paper_id} not found",
-        )
-    return PaperResponse.model_validate(paper)
+async def get_paper(
+    paper_id: UUID, service: IngestionServiceDep
+) -> PaperResponse:
+    return await service.get_paper_with_summaries(paper_id)

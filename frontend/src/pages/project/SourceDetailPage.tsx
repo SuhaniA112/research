@@ -12,7 +12,9 @@ import {
 import { cacheSource } from "@/api/mappers";
 import { getProject } from "@/api/projects";
 import {
+  ensureSourceSummaries,
   getSource,
+  getSourceSync,
   getSummary,
   listCitingSources,
   listRelatedSources,
@@ -29,6 +31,8 @@ import {
   getDefaultSourceBreadcrumbs,
   type SourceNavigationState,
 } from "@/lib/sourcePaths";
+import { readingLevelToSummaryLevel } from "@/lib/summaries";
+import { getProfile } from "@/api/profile";
 import type { Project, Source, SummaryLevel } from "@/types";
 
 export function SourceDetailPage() {
@@ -44,6 +48,12 @@ export function SourceDetailPage() {
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+
+  useEffect(() => {
+    void getProfile().then((profile) => {
+      setSummaryLevel(readingLevelToSummaryLevel(profile.readingLevel));
+    });
+  }, []);
 
   useEffect(() => {
     if (!projectId || !sourceId) {
@@ -86,6 +96,13 @@ export function SourceDetailPage() {
       }
       if (!navState?.source) setSource(null);
     });
+    // Always try to hydrate summaries/key findings for this paper (saved or not).
+    const seed = navState?.source ?? getSourceSync(sourceId);
+    if (seed) {
+      void ensureSourceSummaries(seed).then((hydrated) => {
+        setSource((prev) => hydrated ?? prev);
+      });
+    }
     void listRelatedSources(sourceId).then(setRelatedPapers);
     void listCitingSources(sourceId).then(setCitedSources);
     void listSourceNotes(sourceId).then(setNotes);
@@ -94,9 +111,16 @@ export function SourceDetailPage() {
   }, [projectId, sourceId, location.state]);
 
   useEffect(() => {
-    if (!sourceId) return;
-    void getSummary(sourceId, summaryLevel).then(setSummaryText);
-  }, [sourceId, summaryLevel]);
+    if (!sourceId || !source) return;
+    void getSummary(sourceId, summaryLevel, source).then(setSummaryText);
+  }, [
+    sourceId,
+    summaryLevel,
+    source?.id,
+    source?.summaries?.general,
+    source?.summaries?.graduate,
+    source?.summaries?.expert,
+  ]);
 
   async function handleAddNote() {
     if (!sourceId || !draft.trim()) return;
@@ -175,7 +199,12 @@ export function SourceDetailPage() {
             </p>
           </div>
           <IconButtonGroup>
-            <SaveToProjectButton sourceId={source.id} size="lg" />
+            <SaveToProjectButton
+              sourceId={source.id}
+              source={source}
+              projectId={projectId}
+              size="lg"
+            />
             <PublicationLink sourceId={source.id} size="lg" />
           </IconButtonGroup>
         </div>
@@ -208,7 +237,7 @@ export function SourceDetailPage() {
             <p className="mt-4 text-sm leading-relaxed text-gray-700">
               {summaryText || source.description || "No summary available yet."}
             </p>
-            {summaryText || source.description ? (
+            {source.summaries?.[summaryLevel]?.trim() ? (
               <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
                 <Sparkles className="h-3.5 w-3.5" />
                 AI Generated Description

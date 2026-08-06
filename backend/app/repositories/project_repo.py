@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.project import Project
@@ -18,3 +20,15 @@ class ProjectRepository(BaseRepository[Project]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_all(self) -> int:
+        result = await self.session.execute(select(func.count()).select_from(Project))
+        return int(result.scalar_one())
+
+    async def count_updated_since(self, since: datetime) -> int:
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Project)
+            .where(Project.updated_at >= since)
+        )
+        return int(result.scalar_one())
