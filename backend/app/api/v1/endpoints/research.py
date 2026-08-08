@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.deps import DiscoverySearchServiceDep, ResearchServiceDep
+from app.api.deps import CurrentUserDep, DiscoverySearchServiceDep, ResearchServiceDep
 from app.schemas.research_discovery import (
     DiscoverySearchRequest,
     DiscoverySearchResponse,
@@ -22,11 +22,12 @@ async def get_research_papers(
 async def search_research_papers(
     body: DiscoverySearchRequest,
     service: DiscoverySearchServiceDep,
+    current_user: CurrentUserDep,
 ) -> DiscoverySearchResponse:
     """Database-first discovery with external-provider fallback.
 
-    Authorization: when authentication exists, pass the authenticated user_id into
-    the service so SearchExecution rows are owned correctly. Listing another user's
+    Requires temporary ``X-User-ID`` so project-scoped empty searches and
+    SearchExecution ownership stay user-bound. Listing another user's
     SearchExecution records must remain forbidden.
     """
-    return await service.search(body)
+    return await service.search(body, user_id=current_user.id)

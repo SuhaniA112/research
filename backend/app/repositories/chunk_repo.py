@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +10,23 @@ from app.models.paper import Paper
 from app.models.project_paper import ProjectPaper
 from app.repositories.base import BaseRepository
 from app.schemas.indexing import PreparedChunk
+
+# Over-fetch nearest chunks before paper dedupe so HNSW ANN + LIMIT stays useful.
+DEFAULT_ANN_CANDIDATE_MULTIPLIER = 10
+# Project RAG may need extra candidates when filtering after a global ANN probe.
+DEFAULT_PROJECT_ANN_OVERFETCH = 50
+
+
+def _metadata_fields(chunk: PreparedChunk) -> dict[str, object]:
+    meta = chunk.metadata or {}
+    page_number = meta.get("page_number")
+    content_type = meta.get("content_type")
+    indexer_version = meta.get("indexer_version")
+    return {
+        "page_number": page_number if isinstance(page_number, int) else None,
+        "content_type": str(content_type) if content_type else None,
+        "indexer_version": str(indexer_version) if indexer_version else None,
+    }
 
 
 class ChunkRepository(BaseRepository[Chunk]):
@@ -31,6 +48,7 @@ class ChunkRepository(BaseRepository[Chunk]):
                 chunk_index=chunk.chunk_index,
                 text=chunk.chunk_text,
                 embedding=embedding,
+                **_metadata_fields(chunk),
             )
             for chunk, embedding in zip(chunks, embeddings, strict=True)
         ]
@@ -63,6 +81,9 @@ class ChunkRepository(BaseRepository[Chunk]):
         embedding: list[float],
         *,
         chunk_index: int = 0,
+        page_number: int | None = None,
+        content_type: str | None = None,
+        indexer_version: str | None = None,
     ) -> tuple[Chunk, bool]:
         """Create chunk_index=0 if absent; skip when identical text already embedded.
 
@@ -76,6 +97,9 @@ class ChunkRepository(BaseRepository[Chunk]):
                 return existing, False
             existing.text = text
             existing.embedding = embedding
+            existing.page_number = page_number
+            existing.content_type = content_type
+            existing.indexer_version = indexer_version
             await self.session.flush()
             await self.session.refresh(existing)
             return existing, False
@@ -89,6 +113,9 @@ class ChunkRepository(BaseRepository[Chunk]):
                 chunk_index=chunk_index,
                 text=text,
                 embedding=embedding,
+                page_number=page_number,
+                content_type=content_type,
+                indexer_version=indexer_version,
             )
             .on_conflict_do_nothing(constraint="uq_chunks_paper_id_chunk_index")
             .returning(Chunk.id)
@@ -106,6 +133,9 @@ class ChunkRepository(BaseRepository[Chunk]):
         if existing.text != text:
             existing.text = text
             existing.embedding = embedding
+            existing.page_number = page_number
+            existing.content_type = content_type
+            existing.indexer_version = indexer_version
             await self.session.flush()
             await self.session.refresh(existing)
         return existing, False
@@ -117,24 +147,34 @@ class ChunkRepository(BaseRepository[Chunk]):
         *,
         max_distance: float,
         top_k: int,
+        candidate_multiplier: int = DEFAULT_PROJECT_ANN_OVERFETCH,
     ) -> list[tuple[Chunk, float]]:
-        """Retrieval: vector similarity search over Chunks, scoped to one Project
-        via the ProjectPaper join. Never queries across Projects. Postgres applies
-        the distance threshold in the WHERE clause rather than filtering in the app.
+        """ANN-friendly project-scoped retrieval.
+
+        1. Over-fetch nearest chunks among papers saved in the project
+           (``ORDER BY embedding <=> query LIMIT``) so HNSW can be used.
+        2. Apply the distance threshold in Python.
+        3. Return at most ``top_k`` hits — never chunks outside the project.
         """
         distance = Chunk.embedding.cosine_distance(query_embedding)
+        candidate_limit = max(top_k * candidate_multiplier, top_k)
         stmt = (
             select(Chunk, distance.label("distance"))
             .join(Paper, Chunk.paper_id == Paper.id)
             .join(ProjectPaper, ProjectPaper.paper_id == Paper.id)
             .where(ProjectPaper.project_id == project_id)
-            .where(distance <= max_distance)
             .order_by(distance)
-            .limit(top_k)
+            .limit(candidate_limit)
             .options(selectinload(Chunk.paper))
         )
         result = await self.session.execute(stmt)
-        return [(row[0], row[1]) for row in result.all()]
+        filtered: list[tuple[Chunk, float]] = []
+        for chunk, dist in result.all():
+            if float(dist) <= max_distance:
+                filtered.append((chunk, float(dist)))
+            if len(filtered) >= top_k:
+                break
+        return filtered
 
     async def search_global(
         self,
@@ -142,29 +182,44 @@ class ChunkRepository(BaseRepository[Chunk]):
         *,
         max_distance: float,
         limit: int,
+        candidate_multiplier: int = DEFAULT_ANN_CANDIDATE_MULTIPLIER,
     ) -> list[tuple[Paper, float]]:
-        """Global paper-vector search (not Project-scoped).
+        """Global paper-vector search via ANN candidate retrieval then paper dedupe.
 
-        Aggregates by Paper: when a paper has multiple chunks, keeps the best
-        (lowest) cosine distance. Returns (Paper, distance) ordered by distance.
+        Shape is intentionally ANN-friendly:
+        ``ORDER BY embedding <=> query LIMIT candidate_limit`` first, then
+        threshold filter, then best-distance-per-paper aggregation.
         """
         distance = Chunk.embedding.cosine_distance(query_embedding)
-        fetch_limit = max(limit * 4, limit)
+        candidate_limit = max(limit * candidate_multiplier, limit)
         stmt = (
             select(Chunk, distance.label("distance"))
-            .where(distance <= max_distance)
             .order_by(distance)
-            .limit(fetch_limit)
+            .limit(candidate_limit)
             .options(selectinload(Chunk.paper))
         )
         result = await self.session.execute(stmt)
 
         best_by_paper: dict[UUID, tuple[Paper, float]] = {}
         for chunk, dist in result.all():
+            dist_f = float(dist)
+            if dist_f > max_distance:
+                continue
             paper = chunk.paper
             current = best_by_paper.get(paper.id)
-            if current is None or dist < current[1]:
-                best_by_paper[paper.id] = (paper, float(dist))
+            if current is None or dist_f < current[1]:
+                best_by_paper[paper.id] = (paper, dist_f)
 
-        ranked = sorted(best_by_paper.values(), key=lambda item: item[1])
+        ranked = sorted(best_by_paper.values(), key=lambda item: (item[1], item[0].title.lower()))
         return ranked[:limit]
+
+    async def hnsw_index_exists(self) -> bool:
+        """Return True when the chunks HNSW index is present (for tests)."""
+        result = await self.session.execute(
+            text(
+                "SELECT 1 FROM pg_indexes "
+                "WHERE schemaname = 'public' "
+                "AND indexname = 'ix_chunks_embedding_hnsw'"
+            )
+        )
+        return result.scalar_one_or_none() is not None

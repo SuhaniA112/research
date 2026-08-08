@@ -2,6 +2,7 @@ import feedparser
 import httpx
 
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import merge_topic_lists, normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
 
 
@@ -14,6 +15,7 @@ class ArxivClient(ResearchSourceClient):
             "start": 0,
             "max_results": max_results,
         }
+        query_topics = normalize_topic_list([query])
 
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             response = await client.get(self.BASE_URL, params=params)
@@ -41,6 +43,13 @@ class ArxivClient(ResearchSourceClient):
                 except ValueError:
                     year = None
 
+            # Prefer arXiv category tags when present; always merge split query topics.
+            native_topics = [
+                tag.term
+                for tag in getattr(entry, "tags", [])
+                if getattr(tag, "term", None)
+            ]
+
             results.append(
                 IndPaper(
                     title=entry.title.replace("\n", " ").strip(),
@@ -51,7 +60,7 @@ class ArxivClient(ResearchSourceClient):
                     pdf_url=pdf_url,
                     source="arxiv",
                     external_id=entry.id.split("/")[-1],
-                    topics=[query],
+                    topics=merge_topic_lists(native_topics, query_topics),
                 )
             )
 

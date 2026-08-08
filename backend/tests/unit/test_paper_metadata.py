@@ -55,3 +55,59 @@ def test_better_metadata_upgrades_abstract() -> None:
     assert updates["abstract"] == "Now we have an abstract"
     assert updates["year"] == 2021
     assert updates["authors"] == ["A"]
+
+
+def test_better_metadata_merges_topics() -> None:
+    existing = Paper(
+        source="arxiv",
+        external_id="x",
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        pdf_url=None,
+        topics=["Machine Learning", "NLP"],
+    )
+    incoming = IndPaper(
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        source="arxiv",
+        external_id="x",
+        topics=["machine learning, Computer Vision"],
+    )
+    updates = PaperRepository._better_metadata_updates(existing, incoming)
+    assert updates["topics"] == [
+        "Machine Learning",
+        "NLP",
+        "Computer Vision",
+    ]
+
+
+def test_better_metadata_keeps_existing_topics_when_incoming_shorter() -> None:
+    existing = Paper(
+        source="arxiv",
+        external_id="x",
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        pdf_url=None,
+        topics=["Machine Learning", "Medical Imaging", "Cancer Detection"],
+    )
+    incoming = IndPaper(
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        source="arxiv",
+        external_id="x",
+        topics=["Machine Learning"],
+    )
+    updates = PaperRepository._better_metadata_updates(existing, incoming)
+    assert "topics" not in updates

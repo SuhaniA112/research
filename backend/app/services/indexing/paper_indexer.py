@@ -4,6 +4,7 @@ from app.schemas.indexing import PreparedChunk
 from app.schemas.research_papers import IndPaper
 from app.services.indexing.chunker import PaperChunker, TextChunk
 from app.services.indexing.pdf_extractor import PdfTextExtractor
+from app.services.query_normalization import normalize_topic_list
 
 
 class PaperIndexer:
@@ -34,7 +35,7 @@ class PaperIndexer:
         if not text_chunks:
             return []
 
-        topics = [topic.strip() for topic in paper.topics if topic.strip()]
+        topics = normalize_topic_list(list(paper.topics))
 
         prepared_chunks: list[PreparedChunk] = []
 

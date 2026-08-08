@@ -69,7 +69,12 @@ class Settings(BaseSettings):
     search_default_limit: int = Field(default=20)
     search_max_limit: int = Field(default=50)
     # Over-fetch factor before per-paper aggregation / final limit trimming.
+    # Higher values keep HNSW ANN useful when many chunks map to few papers.
     search_candidate_multiplier: int = Field(default=3)
+    # ANN chunk candidate multiplier for global discovery (limit * this).
+    search_ann_candidate_multiplier: int = Field(default=10)
+    # Extra over-fetch for project-scoped RAG before applying top_k.
+    retrieval_ann_overfetch: int = Field(default=50)
     # Max length of a raw/normalized discovery query.
     search_max_query_length: int = Field(default=500)
 

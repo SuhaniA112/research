@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.paper import Paper
 from app.repositories.base import BaseRepository
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import merge_topic_lists, normalize_topic_list
 
 
 class PaperRepository(BaseRepository[Paper]):
@@ -66,10 +67,11 @@ class PaperRepository(BaseRepository[Paper]):
         if incoming.pdf_url and not existing.pdf_url:
             updates["pdf_url"] = incoming.pdf_url
 
-        if incoming.topics and (
-            not existing.topics or len(incoming.topics) > len(existing.topics)
-        ):
-            updates["topics"] = list(incoming.topics)
+        # Accumulate useful topics: merge existing + incoming, then normalize/dedupe.
+        # Never drop existing topics just because a later search supplied fewer.
+        merged_topics = merge_topic_lists(existing.topics, incoming.topics)
+        if merged_topics != list(existing.topics or []):
+            updates["topics"] = merged_topics
 
         return updates
 
@@ -106,7 +108,7 @@ class PaperRepository(BaseRepository[Paper]):
                 year=paper_in.year,
                 url=paper_in.url,
                 pdf_url=paper_in.pdf_url,
-                topics=list(paper_in.topics or []),
+                topics=normalize_topic_list(paper_in.topics),
             )
             .on_conflict_do_nothing(constraint="uq_papers_source_external_id")
             .returning(Paper.id)

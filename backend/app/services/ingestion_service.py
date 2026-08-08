@@ -38,9 +38,9 @@ class IngestionService:
         self.paper_summarizer = paper_summarizer
 
     async def save_paper_to_project(
-        self, project_id: UUID, paper_in: IndPaper
+        self, project_id: UUID, paper_in: IndPaper, user_id: UUID
     ) -> SavePaperResponse:
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_for_user(project_id, user_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -149,8 +149,10 @@ class IngestionService:
         await self.paper_repo.update(paper)
         return paper
 
-    async def list_papers_for_project(self, project_id: UUID) -> list[PaperResponse]:
-        project = await self.project_repo.get_by_id(project_id)
+    async def list_papers_for_project(
+        self, project_id: UUID, user_id: UUID
+    ) -> list[PaperResponse]:
+        project = await self.project_repo.get_for_user(project_id, user_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -159,8 +161,10 @@ class IngestionService:
         papers = await self.project_paper_repo.list_papers_for_project(project_id)
         return [PaperResponse.model_validate(paper) for paper in papers]
 
-    async def unsave_paper_from_project(self, project_id: UUID, paper_id: UUID) -> bool:
-        project = await self.project_repo.get_by_id(project_id)
+    async def unsave_paper_from_project(
+        self, project_id: UUID, paper_id: UUID, user_id: UUID
+    ) -> bool:
+        project = await self.project_repo.get_for_user(project_id, user_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

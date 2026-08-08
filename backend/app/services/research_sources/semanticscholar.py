@@ -1,6 +1,7 @@
 import httpx
 
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import merge_topic_lists, normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
 
 
@@ -11,8 +12,9 @@ class SemanticScholarClient(ResearchSourceClient):
         params = {
             "query": query,
             "limit": max_results,
-            "fields": "title,abstract,authors,year,url,openAccessPdf",
+            "fields": "title,abstract,authors,year,url,openAccessPdf,fieldsOfStudy",
         }
+        query_topics = normalize_topic_list([query])
 
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(self.BASE_URL, params=params)
@@ -29,6 +31,11 @@ class SemanticScholarClient(ResearchSourceClient):
             ]
 
             open_access_pdf = item.get("openAccessPdf") or {}
+            native_topics = [
+                field
+                for field in (item.get("fieldsOfStudy") or [])
+                if isinstance(field, str) and field.strip()
+            ]
 
             results.append(
                 IndPaper(
@@ -40,7 +47,7 @@ class SemanticScholarClient(ResearchSourceClient):
                     pdf_url=open_access_pdf.get("url"),
                     source="semantic_scholar",
                     external_id=item.get("paperId"),
-                    topics=[query],
+                    topics=merge_topic_lists(native_topics, query_topics),
                 )
             )
 

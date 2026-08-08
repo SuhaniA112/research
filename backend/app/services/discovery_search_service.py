@@ -20,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID
 
+from fastapi import HTTPException, status
+
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.models.paper import Paper
@@ -27,6 +29,8 @@ from app.models.search_topic import SearchTopic
 from app.models.search_topic_paper import SearchTopicPaper
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.paper_repo import PaperRepository
+from app.repositories.profile_repo import ProfileRepository
+from app.repositories.project_repo import ProjectRepository
 from app.repositories.search_execution_repo import SearchExecutionRepository
 from app.repositories.search_topic_paper_repo import SearchTopicPaperRepository
 from app.repositories.search_topic_repo import SearchTopicRepository
@@ -39,7 +43,10 @@ from app.schemas.research_discovery import (
 )
 from app.schemas.research_papers import IndPaper
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
-from app.services.query_normalization import normalize_query
+from app.services.query_normalization import (
+    build_intent_query_from_topics,
+    normalize_query,
+)
 from app.services.research_sources.arxiv import ArxivClient
 from app.services.research_sources.base import ResearchSourceClient
 from app.services.research_sources.dblp import DblpClient
@@ -89,6 +96,8 @@ class DiscoverySearchService:
         search_topic_paper_repo: SearchTopicPaperRepository,
         voyage_client: VoyageEmbeddingClient,
         settings: Settings,
+        project_repo: ProjectRepository | None = None,
+        profile_repo: ProfileRepository | None = None,
         provider_clients: list[ResearchSourceClient] | None = None,
     ) -> None:
         self.paper_repo = paper_repo
@@ -96,6 +105,8 @@ class DiscoverySearchService:
         self.search_topic_repo = search_topic_repo
         self.search_execution_repo = search_execution_repo
         self.search_topic_paper_repo = search_topic_paper_repo
+        self.project_repo = project_repo
+        self.profile_repo = profile_repo
         self.voyage_client = voyage_client
         self.settings = settings
         self.clients = (
@@ -117,8 +128,9 @@ class DiscoverySearchService:
         anonymous_session_id: str | None = None,
     ) -> DiscoverySearchResponse:
         started = time.perf_counter()
-        raw_query = request.query
-        normalized = normalize_query(raw_query)
+        raw_query, normalized = await self._resolve_effective_query(
+            request, user_id=user_id
+        )
         limit = request.limit or self.settings.search_default_limit
         force_refresh = request.force_refresh
 
@@ -136,6 +148,7 @@ class DiscoverySearchService:
             query_embedding,
             max_distance=self.settings.paper_max_distance,
             limit=limit * self.settings.search_candidate_multiplier,
+            candidate_multiplier=self.settings.search_ann_candidate_multiplier,
         )
         topic_assocs = await self.search_topic_paper_repo.list_papers_for_topic(
             topic.id, limit=limit * self.settings.search_candidate_multiplier
@@ -256,6 +269,7 @@ class DiscoverySearchService:
                 query_embedding,
                 max_distance=self.settings.paper_max_distance,
                 limit=limit * self.settings.search_candidate_multiplier,
+                candidate_multiplier=self.settings.search_ann_candidate_multiplier,
             )
             sim_by_id = {p.id: 1.0 - dist for p, dist in paper_hits}
             for cand in candidates:
@@ -323,6 +337,56 @@ class DiscoverySearchService:
             providers_succeeded=provider_stats.succeeded,
             providers_failed=provider_stats.failed,
             results=results,
+        )
+
+    async def _resolve_effective_query(
+        self,
+        request: DiscoverySearchRequest,
+        *,
+        user_id: UUID | None,
+    ) -> tuple[str, str]:
+        """Resolve display (raw) + cache (normalized) query strings.
+
+        - Non-empty explicit query is primary intent (project context is not
+          concatenated, to preserve expected explicit-search caching/behavior).
+        - Empty query + project_id → project topics/keywords (user-scoped).
+        - Empty query + no project → profile research areas/keywords.
+        - Still empty → clear validation error (never invent "research").
+        """
+        explicit = (request.query or "").strip()
+        if explicit:
+            return explicit, normalize_query(explicit)
+
+        if request.project_id is not None:
+            if user_id is None or self.project_repo is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required to search with project context",
+                )
+            project = await self.project_repo.get_for_user(request.project_id, user_id)
+            if project is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Project {request.project_id} not found",
+                )
+            intent = build_intent_query_from_topics(project.topics, project.keywords)
+            if intent:
+                return intent, normalize_query(intent)
+
+        if self.profile_repo is not None:
+            profile = await self.profile_repo.ensure_singleton()
+            intent = build_intent_query_from_topics(
+                profile.research_areas, profile.keywords
+            )
+            if intent:
+                return intent, normalize_query(intent)
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Query must not be empty. Provide a query, a project_id with "
+                "topics/keywords, or configure profile research areas."
+            ),
         )
 
     async def _resolve_topic(

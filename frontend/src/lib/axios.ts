@@ -6,6 +6,11 @@ import axios, {
 
 import { env } from "@/config/env";
 import { clearOnboardingComplete } from "@/lib/onboarding";
+import {
+  clearStoredUserId,
+  getStoredUserId,
+  USER_ID_HEADER,
+} from "@/lib/userContext";
 
 const TOKEN_STORAGE_KEY = "access_token";
 
@@ -20,6 +25,7 @@ export function setAccessToken(token: string): void {
 
 export function clearAccessToken(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
+  clearStoredUserId();
   clearOnboardingComplete();
 }
 
@@ -29,6 +35,11 @@ function attachAuthToken(
   const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Temporary user scoping until real auth exists.
+  const userId = getStoredUserId();
+  if (userId) {
+    config.headers[USER_ID_HEADER] = userId;
   }
   return config;
 }

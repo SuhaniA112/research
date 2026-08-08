@@ -26,7 +26,8 @@ export interface DiscoveryPaper {
 }
 
 export interface DiscoverySearchRequest {
-  query: string;
+  query?: string;
+  project_id?: string;
   limit?: number;
   force_refresh?: boolean;
 }

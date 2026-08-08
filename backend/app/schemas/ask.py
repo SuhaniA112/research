@@ -13,6 +13,7 @@ class Citation(BaseModel):
     chunk_id: UUID
     title: str
     url: str | None
+    page_number: int | None = None
     distance: float
 
 

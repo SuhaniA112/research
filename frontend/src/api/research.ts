@@ -122,9 +122,10 @@ async function searchLegacyPapers(query: string): Promise<Source[]> {
 
 export async function searchSources(
   query = "",
-  options?: { fallbackToLegacy?: boolean },
+  options?: { fallbackToLegacy?: boolean; projectId?: string },
 ): Promise<Source[]> {
   const fallbackToLegacy = options?.fallbackToLegacy !== false;
+  const projectId = options?.projectId;
 
   if (env.useMocks) {
     const q = query.trim().toLowerCase();
@@ -134,11 +135,17 @@ export async function searchSources(
     return filtered.length > 0 ? filtered : mockStore.sources;
   }
 
-  const q = query.trim() || "research";
+  const trimmed = query.trim();
+  // Never invent a generic "research" query — empty intent is resolved by the
+  // backend from project topics/keywords (or profile areas) when projectId is set.
+  if (!trimmed && !projectId) {
+    return [];
+  }
 
   try {
     const response = await searchResearch({
-      query: q,
+      query: trimmed,
+      project_id: projectId,
       limit: 20,
     });
     return response.results.map((item) => {
@@ -154,8 +161,9 @@ export async function searchSources(
     });
   } catch (err) {
     if (!fallbackToLegacy) throw err;
+    if (!trimmed) throw err;
     // Discovery needs Voyage; legacy multi-provider search still works without it.
-    return searchLegacyPapers(q);
+    return searchLegacyPapers(trimmed);
   }
 }
 
@@ -225,7 +233,7 @@ export async function getViewNextSources(
 
   if (pool.length === 0 && searches.length > 0) {
     try {
-      pool = await searchSources(searches[0]!);
+      pool = await searchSources(searches[0]!, { projectId });
       await rememberProjectSearchResults(projectId, pool);
     } catch {
       pool = [];

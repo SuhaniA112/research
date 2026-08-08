@@ -1,6 +1,7 @@
 import httpx
 
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import merge_topic_lists, normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
 
 
@@ -12,6 +13,7 @@ class OpenAlexClient(ResearchSourceClient):
             "search": query,
             "per-page": max_results,
         }
+        query_topics = normalize_topic_list([query])
 
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(self.BASE_URL, params=params)
@@ -29,6 +31,17 @@ class OpenAlexClient(ResearchSourceClient):
                 if name:
                     authors.append(name)
 
+            native_topics: list[str] = []
+            for topic in item.get("topics") or []:
+                display = topic.get("display_name")
+                if display:
+                    native_topics.append(display)
+            if not native_topics:
+                for concept in item.get("concepts") or []:
+                    display = concept.get("display_name")
+                    if display:
+                        native_topics.append(display)
+
             results.append(
                 IndPaper(
                     title=item.get("title") or "Untitled",
@@ -41,7 +54,7 @@ class OpenAlexClient(ResearchSourceClient):
                     pdf_url=(item.get("open_access") or {}).get("oa_url"),
                     source="openalex",
                     external_id=item.get("id"),
-                    topics=[query],
+                    topics=merge_topic_lists(native_topics, query_topics),
                 )
             )
 

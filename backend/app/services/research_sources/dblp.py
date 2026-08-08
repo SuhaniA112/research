@@ -1,6 +1,7 @@
 import httpx
 
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
 
 
@@ -13,6 +14,7 @@ class DblpClient(ResearchSourceClient):
             "format": "json",
             "h": max_results,
         }
+        query_topics = normalize_topic_list([query])
 
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(self.BASE_URL, params=params)
@@ -45,7 +47,8 @@ class DblpClient(ResearchSourceClient):
                     pdf_url=None,
                     source="dblp",
                     external_id=hit.get("@id"),
-                    topics=[query],
+                    # DBLP has no native topic categories; use split query topics.
+                    topics=query_topics,
                 )
             )
 
