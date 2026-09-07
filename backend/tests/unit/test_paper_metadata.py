@@ -68,6 +68,7 @@ def test_better_metadata_merges_topics() -> None:
         url="https://example.com",
         pdf_url=None,
         topics=["Machine Learning", "NLP"],
+        source_categories=[],
     )
     incoming = IndPaper(
         title="Title",
@@ -78,6 +79,7 @@ def test_better_metadata_merges_topics() -> None:
         source="arxiv",
         external_id="x",
         topics=["machine learning, Computer Vision"],
+        source_categories=[],
     )
     updates = PaperRepository._better_metadata_updates(existing, incoming)
     assert updates["topics"] == [
@@ -85,6 +87,36 @@ def test_better_metadata_merges_topics() -> None:
         "NLP",
         "Computer Vision",
     ]
+
+
+def test_better_metadata_strips_query_contaminants_and_maps_categories() -> None:
+    existing = Paper(
+        source="arxiv",
+        external_id="x",
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        pdf_url=None,
+        topics=["cs.CV", "computer vision medical imaging"],
+        source_categories=[],
+    )
+    incoming = IndPaper(
+        title="Title",
+        abstract="Abstract",
+        authors=["A"],
+        year=2020,
+        url="https://example.com",
+        source="arxiv",
+        external_id="x",
+        topics=["Computer Science", "Computer Vision"],
+        source_categories=["cs.CV"],
+    )
+    updates = PaperRepository._better_metadata_updates(existing, incoming)
+    assert updates["source_categories"] == ["cs.CV"]
+    assert updates["topics"] == ["Computer Science", "Computer Vision"]
+    assert "computer vision medical imaging" not in updates["topics"]
 
 
 def test_better_metadata_keeps_existing_topics_when_incoming_shorter() -> None:

@@ -30,6 +30,10 @@ class Paper(Base, TimestampMixin):
     topics: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list
     )
+    # Raw provider taxonomy / source metadata (e.g. arXiv cs.CV). Not display chips.
+    source_categories: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, default=list
+    )
     summary_general: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_graduate: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_expert: Mapped[str | None] = mapped_column(Text, nullable=True)

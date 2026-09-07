@@ -94,6 +94,57 @@ class IngestionService:
             already_saved=not link_created,
         )
 
+    async def reindex_paper(self, paper: Paper) -> int:
+        """Replace PaperIndexer embeddings for one paper using cleaned topics.
+
+        Discovery ANN chunks (title/abstract only) are left untouched when they
+        have no ``indexer_version`` and were never built with topic text.
+        Returns the number of new chunks written, or 0 when skipped / failed.
+        """
+        if not self.voyage_client.api_key:
+            logger.warning("reindex_paper skipped for %s: no Voyage API key", paper.id)
+            return 0
+
+        existing = await self.chunk_repo.list_for_paper(paper.id)
+        # Only reindex papers that were embedded via PaperIndexer (topics in text).
+        needs_topic_reindex = any(
+            chunk.indexer_version for chunk in existing
+        )
+        if existing and not needs_topic_reindex:
+            return 0
+
+        paper_in = IndPaper(
+            title=paper.title,
+            abstract=paper.abstract,
+            authors=list(paper.authors or []),
+            year=paper.year,
+            url=paper.url,
+            pdf_url=paper.pdf_url,
+            source=paper.source,
+            external_id=paper.external_id,
+            topics=list(paper.topics or []),
+            source_categories=list(paper.source_categories or []),
+        )
+
+        try:
+            prepared_chunks = await self.paper_indexer.prepare_chunks(
+                str(paper.id), paper_in
+            )
+            if not prepared_chunks:
+                return 0
+            embeddings = await self.voyage_client.embed(
+                [chunk.embedding_text for chunk in prepared_chunks],
+                input_type="document",
+            )
+            await self.chunk_repo.delete_for_paper(paper.id)
+            await self.chunk_repo.create_many_for_paper(
+                paper.id, prepared_chunks, embeddings
+            )
+            return len(prepared_chunks)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("reindex_paper failed for %s: %s", paper.id, exc)
+            return 0
+
     async def upsert_and_summarize(self, paper_in: IndPaper) -> PaperResponse:
         """Persist a paper (no project link) and generate leveled summaries."""
         if paper_in.external_id is None:

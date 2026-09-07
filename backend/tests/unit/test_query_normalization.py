@@ -75,6 +75,9 @@ class TestNormalizeTopicList:
             "R&D",
             "research and development",
         ]
+        assert normalize_topic_list(["vision and language models"]) == [
+            "vision and language models"
+        ]
 
     def test_already_separated_arrays(self) -> None:
         assert normalize_topic_list(

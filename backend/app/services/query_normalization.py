@@ -78,11 +78,27 @@ def normalize_topic_list(topics: list[str] | None) -> list[str]:
 
 
 def merge_topic_lists(*topic_lists: list[str] | None) -> list[str]:
-    """Merge multiple topic lists, then normalize and dedupe."""
+    """Merge topic lists that describe the SAME entity/context.
+
+    Examples:
+        OK:
+            paper source topics + independently extracted paper topics
+            project topics + project keywords
+
+        NOT OK:
+            paper topics + search query
+            paper topics + profile interests
+            paper topics + project topics
+
+    Search/discovery context must not be promoted into paper metadata merely
+    because that context was used to retrieve the paper.
+    """
     combined: list[str] = []
+
     for topics in topic_lists:
         if topics:
             combined.extend(topics)
+
     return normalize_topic_list(combined)
 
 

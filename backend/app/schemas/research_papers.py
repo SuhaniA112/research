@@ -12,7 +12,10 @@ class IndPaper(BaseModel):
     pdf_url: str | None = None
     source: str
     external_id: str | None = None
+    # User-facing canonical concepts (mapped taxonomy + provider-native labels).
     topics: list[str] = Field(default_factory=list)
+    # Raw provider taxonomy codes (e.g. arXiv cs.CV). Never treat as display chips.
+    source_categories: list[str] = Field(default_factory=list)
 
     @field_validator("title", mode="before")
     @classmethod

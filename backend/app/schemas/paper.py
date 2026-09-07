@@ -32,6 +32,7 @@ class PaperResponse(BaseModel):
     url: str | None
     pdf_url: str | None
     topics: list[str]
+    source_categories: list[str] = Field(default_factory=list)
     summary_general: str | None = None
     summary_graduate: str | None = None
     summary_expert: str | None = None
@@ -58,9 +59,9 @@ class PaperResponse(BaseModel):
             return value
         return clean_paper_text(value)
 
-    @field_validator("key_findings", mode="before")
+    @field_validator("key_findings", "source_categories", "topics", mode="before")
     @classmethod
-    def coerce_key_findings(cls, value: object) -> object:
+    def coerce_list_fields(cls, value: object) -> object:
         return value if value is not None else []
 
 

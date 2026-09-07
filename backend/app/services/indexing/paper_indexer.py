@@ -5,10 +5,12 @@ from app.schemas.research_papers import IndPaper
 from app.services.indexing.chunker import PaperChunker, TextChunk
 from app.services.indexing.pdf_extractor import PdfTextExtractor
 from app.services.query_normalization import normalize_topic_list
+from app.services.taxonomy.paper_topics import sanitize_persisted_topic_fields
 
 
 class PaperIndexer:
-    INDEXER_VERSION = "v1"
+    # Bump when embedding_text composition changes in a way that requires reindex.
+    INDEXER_VERSION = "v2"
 
     def __init__(
         self,
@@ -35,7 +37,11 @@ class PaperIndexer:
         if not text_chunks:
             return []
 
-        topics = normalize_topic_list(list(paper.topics))
+        # Only paper-owned topics (never search intent / raw taxonomy codes).
+        topics, _ = sanitize_persisted_topic_fields(
+            normalize_topic_list(list(paper.topics)),
+            list(paper.source_categories or []),
+        )
 
         prepared_chunks: list[PreparedChunk] = []
 
@@ -61,6 +67,7 @@ class PaperIndexer:
                     metadata={
                         "title": paper.title,
                         "topics": topics,
+                        "source_categories": list(paper.source_categories or []),
                         "authors": paper.authors,
                         "year": paper.year,
                         "source": paper.source,

@@ -74,6 +74,16 @@ class ChunkRepository(BaseRepository[Chunk]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def delete_for_paper(self, paper_id: UUID) -> int:
+        """Delete all chunks for a paper. Returns the number of rows removed."""
+        chunks = await self.list_for_paper(paper_id)
+        count = len(chunks)
+        for chunk in chunks:
+            await self.session.delete(chunk)
+        if count:
+            await self.session.flush()
+        return count
+
     async def ensure_chunk_for_paper(
         self,
         paper_id: UUID,

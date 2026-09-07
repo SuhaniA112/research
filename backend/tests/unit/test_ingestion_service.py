@@ -26,6 +26,7 @@ def _paper(**kwargs) -> Paper:
         url="https://example.com/paper",
         pdf_url=None,
         topics=["retrieval"],
+        source_categories=[],
         key_findings=[],
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
