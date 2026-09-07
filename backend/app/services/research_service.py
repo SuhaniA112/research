@@ -7,12 +7,11 @@ from app.services.research_sources.openalex import OpenAlexClient
 from app.services.research_sources.semanticscholar import SemanticScholarClient
 
 # temporarily hardcoded, till we change it to be from user profile
-HARDCODED_INTERESTS = [
-    "artificial intelligence in healthcare",
-    "machine learning and detection of medical conditions",
-    "computer vision medical imaging",
+HARDCODED_SEARCH_QUERIES = [
+    "artificial intelligence",
+    "machine learning ",
+    "medical imaging",
 ]
-
 
 class ResearchService:
     def __init__(self) -> None:
@@ -26,23 +25,23 @@ class ResearchService:
     async def get_research_for_user(self) -> SearchResponse:
         all_results: list[IndPaper] = []
 
-        for interest in HARDCODED_INTERESTS:
+        for query in HARDCODED_SEARCH_QUERIES:
             for client in self.clients:
                 try:
-                    results = await client.search(interest, max_results=5)
+                    results = await client.search(query, max_results=5)
                     all_results.extend(results)
                 except Exception as error:
                     print(
                         f"Error fetching from {client.__class__.__name__} "
-                        f"for query '{interest}': {error}"
+                        f"for query '{query}': {error}"
                     )
-                # rate-limit Semantic Scholar; may remove this sleep later
+
                 await asyncio.sleep(1)
 
         deduped_results = self._dedupe_results(all_results)
 
         return SearchResponse(
-            interests=HARDCODED_INTERESTS,
+            interests=HARDCODED_SEARCH_QUERIES,
             total_results=len(deduped_results),
             papers=deduped_results,
         )

@@ -1,7 +1,7 @@
 import uuid
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,27 +35,24 @@ class Chunk(Base, TimestampMixin):
     embedding: Mapped[list[float]] = mapped_column(
         Vector(EMBEDDING_DIMENSION), nullable=False
     )
+    # Populated from PaperIndexer PreparedChunk.metadata when available.
+    # Abstract/title-derived chunks leave page_number null (never fabricated).
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    indexer_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
             "paper_id", "chunk_index", name="uq_chunks_paper_id_chunk_index"
         ),
+        # HNSW ANN index matching cosine distance (<=> / vector_cosine_ops).
+        Index(
+            "ix_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )
 
     paper: Mapped["Paper"] = relationship(back_populates="chunks")
-
-    # Deferred: add an ANN index once Chunk row count grows past ~10k or query
-    # latency becomes noticeable. v1's expected volume (manual, save-triggered
-    # ingestion, single implicit workspace) doesn't justify the index
-    # build/maintenance cost yet. Locking in vector_cosine_ops now keeps a
-    # future index consistent with the distance operator already used in
-    # ChunkRepository.search_by_project.
-    #
-    # __table_args__ += (
-    #     Index(
-    #         "ix_chunks_embedding_hnsw", "embedding",
-    #         postgresql_using="hnsw",
-    #         postgresql_with={"m": 16, "ef_construction": 64},
-    #         postgresql_ops={"embedding": "vector_cosine_ops"},
-    #     ),
-    # )

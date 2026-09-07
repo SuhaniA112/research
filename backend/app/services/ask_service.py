@@ -29,6 +29,7 @@ class AskService:
         *,
         max_distance: float,
         top_k: int,
+        ann_overfetch: int = 50,
     ) -> None:
         self.project_repo = project_repo
         self.chunk_repo = chunk_repo
@@ -36,11 +37,17 @@ class AskService:
         self.openrouter_client = openrouter_client
         self.max_distance = max_distance
         self.top_k = top_k
+        self.ann_overfetch = ann_overfetch
 
     async def ask(
-        self, project_id: UUID, question: str, *, debug: bool = False
+        self,
+        project_id: UUID,
+        question: str,
+        *,
+        user_id: UUID,
+        debug: bool = False,
     ) -> AskResponse | tuple[AskResponse, list[UUID]]:
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_for_user(project_id, user_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -55,6 +62,7 @@ class AskService:
             query_embedding,
             max_distance=self.max_distance,
             top_k=self.top_k,
+            candidate_multiplier=self.ann_overfetch,
         )
 
         retrieved_chunk_ids = [chunk.id for chunk, _ in results]
@@ -135,6 +143,7 @@ class AskService:
                     chunk_id=chunk.id,
                     title=chunk.paper.title,
                     url=chunk.paper.url,
+                    page_number=chunk.page_number,
                     distance=distance,
                 )
             )

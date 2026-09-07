@@ -56,7 +56,9 @@ async def score_retrieval_hit(project_id: UUID, item: dict) -> bool:
         return any(chunk.paper_id == expected_paper.id for chunk, _ in results)
 
 
-async def score_generation(project_id: UUID, item: dict, retrieval_hit: bool) -> dict:
+async def score_generation(
+    project_id: UUID, user_id: UUID, item: dict, retrieval_hit: bool
+) -> dict:
     async with AsyncSessionLocal() as session:
         ask_service = build_ask_service(session)
         paper_repo = build_paper_repo(session)
@@ -65,7 +67,7 @@ async def score_generation(project_id: UUID, item: dict, retrieval_hit: bool) ->
             item["source"], item["external_id"]
         )
         response, retrieved_chunk_ids = await ask_service.ask(
-            project_id, item["question"], debug=True
+            project_id, item["question"], user_id=user_id, debug=True
         )
 
         citation_paper_ids = {c.paper_id for c in response.citations}
@@ -90,6 +92,12 @@ async def score_generation(project_id: UUID, item: dict, retrieval_hit: bool) ->
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-id", type=UUID, default=None)
+    parser.add_argument(
+        "--user-id",
+        type=UUID,
+        default=None,
+        help="Project owner user id (required for Ask ownership checks)",
+    )
     args = parser.parse_args()
 
     data = load_golden_set()
@@ -105,6 +113,20 @@ async def main() -> None:
     )
     if project_id is None:
         print("No --project-id given and none stored in golden_set.json.")
+        return
+
+    user_id = args.user_id
+    if user_id is None and data.get("user_id"):
+        user_id = UUID(data["user_id"])
+    if user_id is None:
+        async with AsyncSessionLocal() as session:
+            from app.repositories.project_repo import ProjectRepository
+
+            project = await ProjectRepository(session).get_by_id(project_id)
+            if project is not None and project.user_id is not None:
+                user_id = project.user_id
+    if user_id is None:
+        print("No --user-id given and project has no owner user_id.")
         return
 
     unreviewed = [i["id"] for i in items if not i.get("reviewed")]
@@ -124,7 +146,7 @@ async def main() -> None:
         hit = await score_retrieval_hit(project_id, item)
         hits += int(hit)
 
-        gen = await score_generation(project_id, item, hit)
+        gen = await score_generation(project_id, user_id, item, hit)
         citation_valid += int(gen["citations_within_retrieved"])
 
         flag_reasons = []

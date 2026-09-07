@@ -116,7 +116,7 @@ export function FindSourcesPage() {
     const handle = window.setTimeout(() => {
       setLoading(true);
       setError(null);
-      void searchSources(search)
+      void searchSources(search, { projectId })
         .then((sources) => {
           if (cancelled) return;
           setResults(sources);

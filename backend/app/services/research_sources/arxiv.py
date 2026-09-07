@@ -3,6 +3,10 @@ import httpx
 
 from app.schemas.research_papers import IndPaper
 from app.services.research_sources.base import ResearchSourceClient
+from app.services.taxonomy.paper_topics import (
+    build_paper_topics,
+    normalize_source_categories,
+)
 
 
 class ArxivClient(ResearchSourceClient):
@@ -41,6 +45,16 @@ class ArxivClient(ResearchSourceClient):
                 except ValueError:
                     year = None
 
+            # Query is discovery input only — never copied into paper topics.
+            source_categories = normalize_source_categories(
+                [
+                    tag.term
+                    for tag in getattr(entry, "tags", [])
+                    if getattr(tag, "term", None)
+                ]
+            )
+            topics = build_paper_topics(source_categories=source_categories)
+
             results.append(
                 IndPaper(
                     title=entry.title.replace("\n", " ").strip(),
@@ -51,7 +65,8 @@ class ArxivClient(ResearchSourceClient):
                     pdf_url=pdf_url,
                     source="arxiv",
                     external_id=entry.id.split("/")[-1],
-                    topics=[query],
+                    topics=topics,
+                    source_categories=source_categories,
                 )
             )
 

@@ -1,7 +1,9 @@
 import httpx
 
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
+from app.services.taxonomy.paper_topics import build_paper_topics
 
 
 class OpenAlexClient(ResearchSourceClient):
@@ -21,13 +23,34 @@ class OpenAlexClient(ResearchSourceClient):
         results: list[IndPaper] = []
 
         for item in data.get("results", []):
-            authors = []
+            authors: list[str] = []
 
             for authorship in item.get("authorships", []):
                 author = authorship.get("author", {})
                 name = author.get("display_name")
                 if name:
                     authors.append(name)
+
+            native_topics: list[str] = []
+
+            # Prefer OpenAlex topics, which are more specific than legacy concepts.
+            for topic in item.get("topics") or []:
+                display_name = topic.get("display_name")
+
+                if display_name:
+                    native_topics.append(display_name)
+
+            # Fall back to concepts only when OpenAlex returned no topics.
+            if not native_topics:
+                for concept in item.get("concepts") or []:
+                    display_name = concept.get("display_name")
+
+                    if display_name:
+                        native_topics.append(display_name)
+
+            # Query is discovery input only — never appended to paper topics.
+            provider_topics = normalize_topic_list(native_topics)
+            topics = build_paper_topics(provider_topics=provider_topics)
 
             results.append(
                 IndPaper(
@@ -41,7 +64,8 @@ class OpenAlexClient(ResearchSourceClient):
                     pdf_url=(item.get("open_access") or {}).get("oa_url"),
                     source="openalex",
                     external_id=item.get("id"),
-                    topics=[query],
+                    topics=topics,
+                    source_categories=[],
                 )
             )
 
@@ -54,12 +78,13 @@ class OpenAlexClient(ResearchSourceClient):
         if not inverted_index:
             return None
 
-        words_by_position = {}
+        words_by_position: dict[int, str] = {}
 
         for word, positions in inverted_index.items():
             for position in positions:
                 words_by_position[position] = word
 
         return " ".join(
-            words_by_position[position] for position in sorted(words_by_position)
+            words_by_position[position]
+            for position in sorted(words_by_position)
         )

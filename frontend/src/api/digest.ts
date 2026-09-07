@@ -196,8 +196,8 @@ async function fetchDigestPapers(
   );
 
   // One legacy provider search if discovery is down (e.g. Voyage auth).
-  if (ranked.length === 0) {
-    const fallback = await searchSources(queries[0] ?? "research").catch(
+  if (ranked.length === 0 && queries.length > 0) {
+    const fallback = await searchSources(queries[0]!).catch(
       () => [] as Source[],
     );
     ranked = rankAndDedupe(fallback, interests).filter(

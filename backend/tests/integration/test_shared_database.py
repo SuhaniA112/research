@@ -68,11 +68,41 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         paper_summarizer,
     )
 
+    user_repo = UserRepository(db_session)
+    user_a = await user_repo.create(
+        User(
+            email="usera@example.com",
+            full_name="User A",
+            hashed_password="x",
+            is_active=True,
+        )
+    )
+    user_b = await user_repo.create(
+        User(
+            email="userb@example.com",
+            full_name="User B",
+            hashed_password="x",
+            is_active=True,
+        )
+    )
+
     p1 = await project_repo.create(
-        Project(name="User A Project", topics=["AI/ML"], keywords=[], reading_level="graduate")
+        Project(
+            user_id=user_a.id,
+            name="User A Project",
+            topics=["AI/ML"],
+            keywords=[],
+            reading_level="graduate",
+        )
     )
     p2 = await project_repo.create(
-        Project(name="User B Project", topics=["HCI"], keywords=[], reading_level="graduate")
+        Project(
+            user_id=user_b.id,
+            name="User B Project",
+            topics=["HCI"],
+            keywords=[],
+            reading_level="graduate",
+        )
     )
 
     ind = IndPaper(
@@ -84,8 +114,8 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         external_id="shared-001",
     )
 
-    r1 = await ingestion.save_paper_to_project(p1.id, ind)
-    r2 = await ingestion.save_paper_to_project(p2.id, ind)
+    r1 = await ingestion.save_paper_to_project(p1.id, ind, user_a.id)
+    r2 = await ingestion.save_paper_to_project(p2.id, ind, user_b.id)
 
     assert r1.paper.id == r2.paper.id
 

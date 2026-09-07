@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.paper import PaperResponse
 
@@ -12,16 +12,27 @@ _MAX_LIMIT = 50
 
 
 class DiscoverySearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=_MAX_QUERY_LENGTH)
+    """Database-first discovery request.
+
+    ``query`` may be empty when ``project_id`` is set — the backend builds the
+    effective intent from the project's topics/keywords. Empty query with no
+    usable project/profile context is rejected by the service.
+    """
+
+    query: str = Field(default="", max_length=_MAX_QUERY_LENGTH)
+    project_id: UUID | None = None
     limit: int | None = Field(default=None, ge=1, le=_MAX_LIMIT)
     force_refresh: bool = False
 
-    @field_validator("query")
-    @classmethod
-    def reject_whitespace_only(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("Query must not be empty or whitespace-only")
-        return value
+    @model_validator(mode="after")
+    def validate_query_or_project(self) -> "DiscoverySearchRequest":
+        # Allow whitespace/empty when project context can supply intent.
+        if self.project_id is not None:
+            return self
+        if not (self.query or "").strip():
+            # Keep a clear empty-state path; service may still try profile fallback.
+            return self
+        return self
 
 
 class ProviderFailure(BaseModel):

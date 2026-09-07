@@ -45,7 +45,10 @@ class DblpClient(ResearchSourceClient):
                     pdf_url=None,
                     source="dblp",
                     external_id=hit.get("@id"),
-                    topics=[query],
+                    # DBLP does not return trustworthy topic metadata here.
+                    # An empty list is more truthful than using the search query.
+                    topics=[],
+                    source_categories=[],
                 )
             )
 
@@ -59,6 +62,10 @@ class DblpClient(ResearchSourceClient):
             return [name] if name else []
 
         if isinstance(authors_data, list):
-            return [author.get("text") for author in authors_data if author.get("text")]
+            return [
+                author.get("text")
+                for author in authors_data
+                if author.get("text")
+            ]
 
         return []

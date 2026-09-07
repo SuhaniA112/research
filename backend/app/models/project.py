@@ -15,11 +15,12 @@ class Project(Base, TimestampMixin):
         primary_key=True,
         default=uuid.uuid4,
     )
-    # Forward-compat only; no auth exists yet so this is never enforced today.
+    # Forward-compat ownership; API access is scoped via get_for_user / list_for_user.
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -1,11 +1,14 @@
 from collections.abc import AsyncGenerator
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.current_user import USER_ID_HEADER
 from app.core.config import settings
 from app.core.database import get_async_session
+from app.models.user import User
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.paper_repo import PaperRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
@@ -34,6 +37,45 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
+
+
+async def get_current_user(
+    session: DbSession,
+    x_user_id: Annotated[str | None, Header(alias=USER_ID_HEADER)] = None,
+) -> User:
+    """Resolve the temporary current user from ``X-User-ID``.
+
+    Temporary until real authentication exists. Validates UUID format and that
+    the user row exists and is active. Do not parse this header in endpoints.
+    """
+    if x_user_id is None or not str(x_user_id).strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                f"Missing {USER_ID_HEADER} header. "
+                "Temporary user context is required until real auth exists."
+            ),
+        )
+
+    try:
+        user_id = UUID(str(x_user_id).strip())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{USER_ID_HEADER} must be a valid UUID",
+        ) from exc
+
+    user_repo = UserRepository(session)
+    user = await user_repo.get_active_by_id(user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"User {user_id} not found or inactive",
+        )
+    return user
+
+
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 def get_user_repository(session: DbSession) -> UserRepository:
@@ -190,6 +232,7 @@ def get_ask_service(
         openrouter_client,
         max_distance=settings.retrieval_max_distance,
         top_k=settings.retrieval_top_k,
+        ann_overfetch=settings.retrieval_ann_overfetch,
     )
 
 
@@ -199,6 +242,8 @@ def get_discovery_search_service(
     search_topic_repo: SearchTopicRepoDep,
     search_execution_repo: SearchExecutionRepoDep,
     search_topic_paper_repo: SearchTopicPaperRepoDep,
+    project_repo: ProjectRepoDep,
+    profile_repo: ProfileRepoDep,
     voyage_client: VoyageClientDep,
 ) -> DiscoverySearchService:
     return DiscoverySearchService(
@@ -207,6 +252,8 @@ def get_discovery_search_service(
         search_topic_repo=search_topic_repo,
         search_execution_repo=search_execution_repo,
         search_topic_paper_repo=search_topic_paper_repo,
+        project_repo=project_repo,
+        profile_repo=profile_repo,
         voyage_client=voyage_client,
         settings=settings,
     )

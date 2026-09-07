@@ -2,25 +2,36 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_discovery_search_service
+from app.api.deps import get_current_user, get_discovery_search_service
 from app.main import app
+from app.models.user import User
 from app.schemas.research_discovery import DiscoverySearchResponse
 
 
 @pytest.fixture
 def override_discovery_service():
     service = AsyncMock()
+    user = User(
+        id=uuid4(),
+        email="search@example.com",
+        full_name="Searcher",
+        hashed_password="x",
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
 
     async def _search(body, **kwargs):
         return DiscoverySearchResponse(
             query=body.query,
-            normalized_query=body.query.strip(),
+            normalized_query=(body.query or "").strip().casefold() or "fallback",
             search_execution_id=uuid4(),
             matched_topic_id=uuid4(),
             topic_match_type="new",
@@ -35,32 +46,30 @@ def override_discovery_service():
 
     service.search.side_effect = _search
     app.dependency_overrides[get_discovery_search_service] = lambda: service
-    yield service
+    app.dependency_overrides[get_current_user] = lambda: user
+    yield service, user
     app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
-async def test_empty_query_returns_422(override_discovery_service) -> None:
+async def test_missing_auth_returns_401() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post("/api/v1/research/search", json={"query": ""})
-    assert response.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_whitespace_query_returns_422(override_discovery_service) -> None:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post("/api/v1/research/search", json={"query": "   "})
-    assert response.status_code == 422
+        response = await client.post(
+            "/api/v1/research/search", json={"query": "graphs"}
+        )
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_invalid_limit_returns_422(override_discovery_service) -> None:
+    _, user = override_discovery_service
+    headers = {"X-User-ID": str(user.id)}
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/research/search",
+            headers=headers,
             json={"query": "graphs", "limit": 0},
         )
     assert response.status_code == 422
@@ -68,6 +77,7 @@ async def test_invalid_limit_returns_422(override_discovery_service) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/research/search",
+            headers=headers,
             json={"query": "graphs", "limit": 999},
         )
     assert response.status_code == 422
@@ -75,10 +85,12 @@ async def test_invalid_limit_returns_422(override_discovery_service) -> None:
 
 @pytest.mark.asyncio
 async def test_search_endpoint_success(override_discovery_service) -> None:
+    _, user = override_discovery_service
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/research/search",
+            headers={"X-User-ID": str(user.id)},
             json={"query": "contextual retrieval", "limit": 10, "force_refresh": False},
         )
     assert response.status_code == 200

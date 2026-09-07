@@ -8,6 +8,11 @@ from sqlalchemy.orm import selectinload
 from app.models.paper import Paper
 from app.repositories.base import BaseRepository
 from app.schemas.research_papers import IndPaper
+from app.services.query_normalization import merge_topic_lists
+from app.services.taxonomy.paper_topics import (
+    normalize_source_categories,
+    sanitize_persisted_topic_fields,
+)
 
 
 class PaperRepository(BaseRepository[Paper]):
@@ -66,10 +71,21 @@ class PaperRepository(BaseRepository[Paper]):
         if incoming.pdf_url and not existing.pdf_url:
             updates["pdf_url"] = incoming.pdf_url
 
-        if incoming.topics and (
-            not existing.topics or len(incoming.topics) > len(existing.topics)
-        ):
-            updates["topics"] = list(incoming.topics)
+        merged_categories = normalize_source_categories(
+            list(existing.source_categories or [])
+            + list(incoming.source_categories or [])
+        )
+        # Merge then sanitize so legacy query contaminants / raw codes are removed
+        # even when a later provider refresh supplies fewer topics.
+        clean_topics, clean_categories = sanitize_persisted_topic_fields(
+            merge_topic_lists(existing.topics, incoming.topics),
+            merged_categories,
+        )
+
+        if clean_categories != list(existing.source_categories or []):
+            updates["source_categories"] = clean_categories
+        if clean_topics != list(existing.topics or []):
+            updates["topics"] = clean_topics
 
         return updates
 
@@ -93,6 +109,11 @@ class PaperRepository(BaseRepository[Paper]):
                 await self.session.flush()
             return existing, False
 
+        topics, source_categories = sanitize_persisted_topic_fields(
+            paper_in.topics,
+            paper_in.source_categories,
+        )
+
         new_id = uuid4()
         stmt = (
             insert(Paper)
@@ -106,7 +127,8 @@ class PaperRepository(BaseRepository[Paper]):
                 year=paper_in.year,
                 url=paper_in.url,
                 pdf_url=paper_in.pdf_url,
-                topics=list(paper_in.topics or []),
+                topics=topics,
+                source_categories=source_categories,
             )
             .on_conflict_do_nothing(constraint="uq_papers_source_external_id")
             .returning(Paper.id)
