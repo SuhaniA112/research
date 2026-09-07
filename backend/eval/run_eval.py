@@ -12,12 +12,14 @@ import json
 from pathlib import Path
 from uuid import UUID
 
+from app.core.auth import CurrentUser
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from eval._wiring import (
     build_ask_service,
     build_paper_repo,
     build_chunk_repo,
+    build_project_repo,
     build_voyage_client,
 )
 
@@ -60,12 +62,17 @@ async def score_generation(project_id: UUID, item: dict, retrieval_hit: bool) ->
     async with AsyncSessionLocal() as session:
         ask_service = build_ask_service(session)
         paper_repo = build_paper_repo(session)
+        project_repo = build_project_repo(session)
 
         expected_paper = await paper_repo.get_by_source_and_external_id(
             item["source"], item["external_id"]
         )
+        project = await project_repo.get_by_id(project_id)
+        if project is None:
+            raise ValueError(f"eval project {project_id} not found")
+        current_user = CurrentUser(id=project.user_id)
         response, retrieved_chunk_ids = await ask_service.ask(
-            project_id, item["question"], debug=True
+            project_id, item["question"], current_user, debug=True
         )
 
         citation_paper_ids = {c.paper_id for c in response.citations}

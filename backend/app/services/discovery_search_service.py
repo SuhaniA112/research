@@ -113,7 +113,7 @@ class DiscoverySearchService:
         self,
         request: DiscoverySearchRequest,
         *,
-        user_id: UUID | None = None,
+        user_id: str,
         anonymous_session_id: str | None = None,
     ) -> DiscoverySearchResponse:
         started = time.perf_counter()

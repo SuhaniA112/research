@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import CurrentUser, get_current_user
 from app.core.config import settings
 from app.core.database import get_async_session
 from app.repositories.chunk_repo import ChunkRepository
@@ -14,7 +15,6 @@ from app.repositories.search_execution_repo import SearchExecutionRepository
 from app.repositories.search_topic_paper_repo import SearchTopicPaperRepository
 from app.repositories.search_topic_repo import SearchTopicRepository
 from app.repositories.profile_repo import ProfileRepository
-from app.repositories.user_repo import UserRepository
 from app.services.ask_service import AskService
 from app.services.discovery_search_service import DiscoverySearchService
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
@@ -25,7 +25,6 @@ from app.services.profile_service import ProfileService
 from app.services.project_service import ProjectService
 from app.services.research_service import ResearchService
 from app.services.summarization.paper_summarizer import PaperSummarizer
-from app.services.user_service import UserService
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -34,17 +33,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
-
-
-def get_user_repository(session: DbSession) -> UserRepository:
-    return UserRepository(session)
-
-
-UserRepoDep = Annotated[UserRepository, Depends(get_user_repository)]
-
-
-def get_user_service(user_repo: UserRepoDep) -> UserService:
-    return UserService(user_repo)
+CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 
 
 def get_research_service() -> ResearchService:
@@ -52,7 +41,6 @@ def get_research_service() -> ResearchService:
 
 
 ResearchServiceDep = Annotated[ResearchService, Depends(get_research_service)]
-UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 
 def get_profile_repository(session: DbSession) -> ProfileRepository:

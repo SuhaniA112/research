@@ -5,17 +5,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models.profile import SINGLETON_PROFILE_ID, Profile
+from app.core.auth import CurrentUser
+from app.models.profile import Profile
 from app.schemas.profile import ProfileUpdate
 from app.services.profile_service import ProfileService
+
+_USER_ID = "user_test_profile"
 
 
 def _profile(**overrides: object) -> Profile:
     base = dict(
-        id=SINGLETON_PROFILE_ID,
-        name="Alex",
-        full_name="Alex Chen",
-        email="alex@example.com",
+        id=_USER_ID,
         occupation="Student",
         institution="Cornell",
         research_areas=["HCI"],
@@ -32,8 +32,9 @@ def _profile(**overrides: object) -> Profile:
 
 @pytest.mark.asyncio
 async def test_get_me_computes_stats() -> None:
+    current_user = CurrentUser(id=_USER_ID)
     profile_repo = AsyncMock()
-    profile_repo.ensure_singleton.return_value = _profile()
+    profile_repo.ensure_for_user.return_value = _profile()
     project_repo = AsyncMock()
     project_repo.count_all.return_value = 3
     project_repo.count_updated_since.return_value = 1
@@ -41,10 +42,10 @@ async def test_get_me_computes_stats() -> None:
     project_paper_repo.count_distinct_papers.return_value = 7
 
     service = ProfileService(profile_repo, project_repo, project_paper_repo)
-    result = await service.get_me()
+    result = await service.get_me(current_user)
 
-    assert result.name == "Alex"
-    assert result.full_name == "Alex Chen"
+    # In AUTH_MODE=mock, display identity is a fixed sentinel (never stored locally).
+    assert result.name == "Researcher"
     assert result.member_since == "Jan 2024"
     assert result.projects_count == 3
     assert result.sources_saved == 7
@@ -54,9 +55,10 @@ async def test_get_me_computes_stats() -> None:
 
 @pytest.mark.asyncio
 async def test_update_me_persists_patch() -> None:
+    current_user = CurrentUser(id=_USER_ID)
     profile = _profile()
     profile_repo = AsyncMock()
-    profile_repo.ensure_singleton.return_value = profile
+    profile_repo.ensure_for_user.return_value = profile
     profile_repo.update.side_effect = lambda p: p
     project_repo = AsyncMock()
     project_repo.count_all.return_value = 0
@@ -66,7 +68,8 @@ async def test_update_me_persists_patch() -> None:
 
     service = ProfileService(profile_repo, project_repo, project_paper_repo)
     result = await service.update_me(
-        ProfileUpdate(reading_level="casual", research_areas=["AI/ML"])
+        current_user,
+        ProfileUpdate(reading_level="casual", research_areas=["AI/ML"]),
     )
 
     assert profile.reading_level == "casual"

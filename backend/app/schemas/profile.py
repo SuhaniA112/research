@@ -7,9 +7,7 @@ ReadingLevel = Literal["casual", "graduate", "expert"]
 
 
 class ProfileUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    full_name: str | None = Field(default=None, min_length=1, max_length=255)
-    email: str | None = Field(default=None, max_length=255)
+    # name/full_name/email are owned by Clerk (edit via Clerk's account UI), not here.
     occupation: str | None = Field(default=None, max_length=255)
     institution: str | None = Field(default=None, max_length=255)
     research_areas: list[str] | None = None

@@ -2,7 +2,7 @@ import json
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, PostgresDsn, field_validator
+from pydantic import Field, PostgresDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
+
+    # "mock" bypasses Clerk entirely and authenticates every request as a fixed
+    # local dev user — never allowed when app_env=production (see validator below).
+    auth_mode: Literal["mock", "clerk"] = "mock"
+    clerk_secret_key: str = Field(default="")
+    # PEM public key (Clerk dashboard: API Keys -> Show JWT Public Key). Enables
+    # networkless session token verification — no request-time call to Clerk.
+    clerk_jwt_key: str = Field(default="")
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     log_json: bool = False
@@ -87,6 +95,15 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in parsed if str(origin).strip()]
 
         return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def _forbid_mock_auth_in_production(self) -> "Settings":
+        if self.auth_mode == "mock" and self.app_env == "production":
+            raise ValueError(
+                "AUTH_MODE=mock is not allowed when APP_ENV=production. "
+                "Set AUTH_MODE=clerk and configure CLERK_SECRET_KEY / CLERK_JWT_KEY."
+            )
+        return self
 
     @property
     def is_production(self) -> bool:

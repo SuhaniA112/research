@@ -22,7 +22,7 @@ class SearchExecutionRepository(BaseRepository[SearchExecution]):
         force_refresh: bool,
         requested_limit: int,
         results_returned: int,
-        user_id: UUID | None = None,
+        user_id: str,
         anonymous_session_id: str | None = None,
     ) -> SearchExecution:
         """Persist a per-request search history row (cache hits included)."""

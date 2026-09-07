@@ -22,14 +22,13 @@ from app.models.chunk import Chunk
 from app.models.paper import Paper
 from app.models.project import Project
 from app.models.project_paper import ProjectPaper
-from app.models.user import User
 
 pytestmark = pytest.mark.integration
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
+# "users" existed through 0004 but is dropped by 0005 (identity moved to Clerk).
 _EXPECTED_TABLES = {
-    "users",
     "profiles",
     "projects",
     "papers",
@@ -41,7 +40,6 @@ _EXPECTED_TABLES = {
 }
 
 _BASELINE_TABLES = (
-    User.__table__,
     Project.__table__,
     Paper.__table__,
     Chunk.__table__,
@@ -117,7 +115,7 @@ def test_migration_clean_install_from_empty_database(test_database_url) -> None:
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0004_app_profile"
+    assert version == "0005_clerk_auth"
 
     # alembic current should report head (no unfinished upgrade).
     command.current(cfg)
@@ -149,7 +147,6 @@ def test_migration_upgrade_from_existing_baseline_schema(test_database_url) -> N
     asyncio.run(_prepare_baseline_only())
 
     before = asyncio.run(_list_public_tables(test_database_url))
-    assert "users" in before
     assert "papers" in before
     assert "chunks" in before
     assert "projects" in before
@@ -163,8 +160,10 @@ def test_migration_upgrade_from_existing_baseline_schema(test_database_url) -> N
 
     after = asyncio.run(_list_public_tables(test_database_url))
     assert _EXPECTED_TABLES.issubset(after)
+    # 0000 creates "users" for compatibility with pre-0005 chains; 0005 drops it.
+    assert "users" not in after
 
     version = asyncio.run(_alembic_version(test_database_url))
     assert version == head
-    assert version == "0004_app_profile"
+    assert version == "0005_clerk_auth"
     command.current(cfg)

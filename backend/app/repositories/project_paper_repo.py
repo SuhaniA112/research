@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.paper import Paper
+from app.models.project import Project
 from app.models.project_paper import ProjectPaper
 
 
@@ -79,9 +80,11 @@ class ProjectPaperRepository:
         result = await self.session.execute(stmt)
         return {project_id: int(count) for project_id, count in result.all()}
 
-    async def count_distinct_papers(self) -> int:
+    async def count_distinct_papers(self, user_id: str) -> int:
         result = await self.session.execute(
             select(func.count(func.distinct(ProjectPaper.paper_id)))
+            .join(Project, Project.id == ProjectPaper.project_id)
+            .where(Project.user_id == user_id)
         )
         return int(result.scalar_one())
 

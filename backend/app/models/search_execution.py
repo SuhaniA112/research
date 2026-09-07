@@ -11,11 +11,10 @@ from app.models.base import Base
 
 
 class SearchExecution(Base):
-    """User-specific (or anonymous) record that a search was performed.
+    """Per-user record that a search was performed.
 
     Every search request creates a row, including cache hits. Raw query history
-    stays private; this table must not be exposed globally. Authorization for
-    listing a user's own executions is deferred until authentication exists.
+    stays private; this table must not be exposed globally.
     """
 
     __tablename__ = "search_executions"
@@ -25,13 +24,8 @@ class SearchExecution(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    # Nullable until authentication exists; structure ready for real user IDs.
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
+    # Clerk user id (JWT `sub` claim). No local FK — Clerk owns identity.
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     search_topic_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("search_topics.id", ondelete="CASCADE"),

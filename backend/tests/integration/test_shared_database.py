@@ -15,13 +15,13 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.auth import CurrentUser
 from app.core.config import Settings
 from app.models.chunk import Chunk
 from app.models.paper import Paper
 from app.models.project import Project
 from app.models.project_paper import ProjectPaper
 from app.models.search_execution import SearchExecution
-from app.models.user import User
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.paper_repo import PaperRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
@@ -29,7 +29,6 @@ from app.repositories.project_repo import ProjectRepository
 from app.repositories.search_execution_repo import SearchExecutionRepository
 from app.repositories.search_topic_paper_repo import SearchTopicPaperRepository
 from app.repositories.search_topic_repo import SearchTopicRepository
-from app.repositories.user_repo import UserRepository
 from app.schemas.research_discovery import DiscoverySearchRequest
 from app.schemas.research_papers import IndPaper
 from app.services.discovery_search_service import DiscoverySearchService
@@ -68,11 +67,26 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         paper_summarizer,
     )
 
+    user_a = CurrentUser(id=f"user-a-{uuid4()}")
+    user_b = CurrentUser(id=f"user-b-{uuid4()}")
+
     p1 = await project_repo.create(
-        Project(name="User A Project", topics=["AI/ML"], keywords=[], reading_level="graduate")
+        Project(
+            user_id=user_a.id,
+            name="User A Project",
+            topics=["AI/ML"],
+            keywords=[],
+            reading_level="graduate",
+        )
     )
     p2 = await project_repo.create(
-        Project(name="User B Project", topics=["HCI"], keywords=[], reading_level="graduate")
+        Project(
+            user_id=user_b.id,
+            name="User B Project",
+            topics=["HCI"],
+            keywords=[],
+            reading_level="graduate",
+        )
     )
 
     ind = IndPaper(
@@ -84,8 +98,8 @@ async def test_global_paper_shared_across_projects(db_session) -> None:
         external_id="shared-001",
     )
 
-    r1 = await ingestion.save_paper_to_project(p1.id, ind)
-    r2 = await ingestion.save_paper_to_project(p2.id, ind)
+    r1 = await ingestion.save_paper_to_project(p1.id, ind, user_a)
+    r2 = await ingestion.save_paper_to_project(p2.id, ind, user_b)
 
     assert r1.paper.id == r2.paper.id
 
@@ -188,7 +202,6 @@ async def test_discovery_cache_hit_and_execution_privacy(
     topic_repo = SearchTopicRepository(db_session)
     execution_repo = SearchExecutionRepository(db_session)
     topic_paper_repo = SearchTopicPaperRepository(db_session)
-    user_repo = UserRepository(db_session)
 
     settings = Settings(
         app_env="test",
@@ -200,21 +213,8 @@ async def test_discovery_cache_hit_and_execution_privacy(
     emb = _unit_vec(10)
     mock_voyage.embed.return_value = [emb]
 
-    user_a = await user_repo.create(
-        User(
-            email=f"user-a-{uuid4()}@example.com",
-            full_name="User A",
-            hashed_password="hashed-a",
-        )
-    )
-    user_b = await user_repo.create(
-        User(
-            email=f"user-b-{uuid4()}@example.com",
-            full_name="User B",
-            hashed_password="hashed-b",
-        )
-    )
-    await db_session.flush()
+    user_a_id = f"user-a-{uuid4()}"
+    user_b_id = f"user-b-{uuid4()}"
 
     topic, _ = await topic_repo.get_or_create_by_normalized_query(
         canonical_query="neural ir",
@@ -260,10 +260,10 @@ async def test_discovery_cache_hit_and_execution_privacy(
     )
 
     r1 = await service.search(
-        DiscoverySearchRequest(query="neural ir", limit=2), user_id=user_a.id
+        DiscoverySearchRequest(query="neural ir", limit=2), user_id=user_a_id
     )
     r2 = await service.search(
-        DiscoverySearchRequest(query="neural ir", limit=2), user_id=user_b.id
+        DiscoverySearchRequest(query="neural ir", limit=2), user_id=user_b_id
     )
 
     assert r1.cache_hit is True
@@ -282,7 +282,7 @@ async def test_discovery_cache_hit_and_execution_privacy(
         .all()
     )
     assert len(exec_rows) == 2
-    assert {row.user_id for row in exec_rows} == {user_a.id, user_b.id}
+    assert {row.user_id for row in exec_rows} == {user_a_id, user_b_id}
     assert {row.search_topic_id for row in exec_rows} == {topic.id}
 
     paper_count = await db_session.scalar(select(func.count()).select_from(Paper))
@@ -294,7 +294,7 @@ async def test_discovery_cache_hit_and_execution_privacy(
     assert "user_id" not in dumped
     assert "raw_query" not in dumped or dumped.get("query") == "neural ir"
     # Another user's identity / private execution fields are never returned.
-    assert user_b.id not in {
+    assert user_b_id not in {
         dumped.get("search_execution_id"),
         dumped.get("matched_topic_id"),
     }

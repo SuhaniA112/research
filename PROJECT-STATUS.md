@@ -1,7 +1,7 @@
 # PaperSearcher — Project Status
 
 This document describes what exists on `main` / current wiring branches today
-and what remains to be done. Updated 2026-08-04.
+and what remains to be done. Updated 2026-09-07.
 
 ## What exists
 
@@ -30,8 +30,17 @@ FastAPI + async SQLAlchemy + Postgres (pgvector). Schema is applied with **Alemb
 
 **Auth**
 
-- `User` model / CRUD by UUID exists; **no** login/session/`/users/me` yet
-- `Project.user_id` is unused for ownership
+- Clerk is the identity provider — no local `users` table; `Project.user_id` /
+  `SearchExecution.user_id` store the Clerk user id directly and are enforced
+  (`NOT NULL`, ownership-checked on every read/write)
+- `AUTH_MODE=mock` (backend) / `VITE_AUTH_MODE=mock` (frontend) — default for local
+  dev, authenticates every request as a fixed dev user, no Clerk account needed
+- `AUTH_MODE=clerk` — verifies real Clerk session tokens (networkless JWT
+  verification); required whenever `APP_ENV=production` (`mock` is refused at
+  startup in production)
+- `GET/PATCH /api/v1/profile` — app-specific preferences only (occupation,
+  institution, research areas, reading level, notification prefs); name/email
+  are read live from Clerk, never stored locally
 
 ### Frontend
 
@@ -47,7 +56,9 @@ React app talks to the API through `frontend/src/api/*` adapters.
 1. **API keys + E2E** — set real `VOYAGE_API_KEY` / `OPENROUTER_API_KEY` in `backend/.env`,
    run API, then `backend/.venv/bin/python scripts/e2e_save_ask.py`
    (ask is API-only for verification; **no Ask UI** — out of product scope)
-2. **Auth** — login/session, `/users/me`, scope projects by `user_id`
+2. **Deployment auth config** — no deployment target is chosen yet; when one is,
+   set `AUTH_MODE=clerk` / `VITE_AUTH_MODE=clerk` and configure `CLERK_SECRET_KEY`,
+   `CLERK_JWT_KEY`, `VITE_CLERK_PUBLISHABLE_KEY` for that environment
 3. **Summaries / digest** — leveled AI summaries + hub digest still need backends (or hide)
 4. **Stats / related / key findings** — breakdown/validity still placeholders; related/cites empty
 5. **Persist project create fields** — topics/keywords/reading level dropped on create

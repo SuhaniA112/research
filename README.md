@@ -24,6 +24,26 @@ Edit `backend/.env`:
 - `VOYAGE_API_KEY` — faster discovery + embeddings on save
 - `OPENROUTER_API_KEY` — ask / generation
 
+### Auth
+
+By default both sides run in **mock auth mode** — every request is authenticated
+as a fixed local dev user, no Clerk account needed. This is the out-of-the-box
+setup from `npm run setup` / `npm run dev`.
+
+To exercise real Clerk sign-in/sign-up locally:
+
+1. Create a Clerk application at [clerk.com](https://clerk.com) (email/password only
+   is enough to start).
+2. In `backend/.env`, set `AUTH_MODE=clerk` and fill in `CLERK_SECRET_KEY` and
+   `CLERK_JWT_KEY` (dashboard: API Keys → Show JWT Public Key).
+3. In `frontend/.env.local`, set `VITE_AUTH_MODE=clerk` and fill in
+   `VITE_CLERK_PUBLISHABLE_KEY`.
+4. Both sides must be switched together — mixing `mock` and `clerk` across
+   frontend/backend won't authenticate correctly.
+
+`AUTH_MODE=mock` is refused at startup whenever `APP_ENV=production`, so it can't
+accidentally ship live.
+
 ### Frontend-only (mocks)
 
 ```bash

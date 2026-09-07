@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
+import { AppAuthProvider } from "@/lib/auth";
 import { StarredProvider } from "@/providers/StarredProvider";
 
 const queryClient = new QueryClient({
@@ -20,10 +21,12 @@ interface AppProviderProps {
 
 export function AppProvider({ children }: AppProviderProps) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <StarredProvider>{children}</StarredProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <AppAuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <StarredProvider>{children}</StarredProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </AppAuthProvider>
   );
 }

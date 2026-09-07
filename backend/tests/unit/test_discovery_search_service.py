@@ -155,7 +155,8 @@ async def test_cache_hit_skips_external_providers(repos, mock_voyage) -> None:
     service = _build_service(repos, mock_voyage, settings, [provider])
 
     response = await service.search(
-        DiscoverySearchRequest(query="contextual retrieval", limit=5)
+        DiscoverySearchRequest(query="contextual retrieval", limit=5),
+        user_id="test-user",
     )
 
     assert response.cache_hit is True
@@ -181,7 +182,8 @@ async def test_exact_normalized_query_reuses_topic(repos, mock_voyage) -> None:
 
     service = _build_service(repos, mock_voyage, settings, [])
     response = await service.search(
-        DiscoverySearchRequest(query="  contextual   retrieval ", force_refresh=True)
+        DiscoverySearchRequest(query="  contextual   retrieval ", force_refresh=True),
+        user_id="test-user",
     )
 
     assert response.topic_match_type == "exact"
@@ -206,7 +208,8 @@ async def test_semantic_topic_reuse(repos, mock_voyage) -> None:
     response = await service.search(
         DiscoverySearchRequest(
             query="contextual literature retrieval", force_refresh=True
-        )
+        ),
+        user_id="test-user",
     )
 
     assert response.topic_match_type == "semantic"
@@ -248,7 +251,8 @@ async def test_force_refresh_calls_providers(repos, mock_voyage) -> None:
     response = await service.search(
         DiscoverySearchRequest(
             query="contextual retrieval", limit=5, force_refresh=True
-        )
+        ),
+        user_id="test-user",
     )
 
     assert response.cache_hit is False
@@ -284,7 +288,8 @@ async def test_low_similarity_triggers_fallback(repos, mock_voyage) -> None:
 
     service = _build_service(repos, mock_voyage, settings, [provider])
     response = await service.search(
-        DiscoverySearchRequest(query="contextual retrieval", limit=5)
+        DiscoverySearchRequest(query="contextual retrieval", limit=5),
+        user_id="test-user",
     )
 
     assert response.cache_hit is False
@@ -317,7 +322,8 @@ async def test_stale_topic_triggers_refresh(repos, mock_voyage) -> None:
 
     service = _build_service(repos, mock_voyage, settings, [provider])
     response = await service.search(
-        DiscoverySearchRequest(query="contextual retrieval", limit=5)
+        DiscoverySearchRequest(query="contextual retrieval", limit=5),
+        user_id="test-user",
     )
 
     assert response.cache_miss_reason == "stale_topic"
@@ -347,7 +353,8 @@ async def test_insufficient_results_triggers_fallback(repos, mock_voyage) -> Non
 
     service = _build_service(repos, mock_voyage, settings, [provider])
     response = await service.search(
-        DiscoverySearchRequest(query="contextual retrieval", limit=5)
+        DiscoverySearchRequest(query="contextual retrieval", limit=5),
+        user_id="test-user",
     )
 
     assert response.cache_miss_reason == "insufficient_results"
@@ -385,7 +392,8 @@ async def test_provider_failure_does_not_abort_others(repos, mock_voyage) -> Non
 
     service = _build_service(repos, mock_voyage, settings, [failing, succeeding])
     response = await service.search(
-        DiscoverySearchRequest(query="brand new obscure topic xyz", limit=5)
+        DiscoverySearchRequest(query="brand new obscure topic xyz", limit=5),
+        user_id="test-user",
     )
 
     assert response.external_search_performed is True
@@ -413,12 +421,14 @@ async def test_repeated_searches_create_separate_executions(repos, mock_voyage) 
     r1 = await service.search(
         DiscoverySearchRequest(
             query="contextual retrieval", limit=1, force_refresh=True
-        )
+        ),
+        user_id="test-user",
     )
     r2 = await service.search(
         DiscoverySearchRequest(
             query="contextual retrieval", limit=1, force_refresh=True
-        )
+        ),
+        user_id="test-user",
     )
 
     assert r1.search_execution_id != r2.search_execution_id

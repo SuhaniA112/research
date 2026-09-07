@@ -1,9 +1,10 @@
 /**
  * Backend:
- * GET   /api/v1/users/me
- * PATCH /api/v1/users/me
+ * GET   /api/v1/profile
+ * PATCH /api/v1/profile
  *
- * Shared singleton profile until auth exists. No JWT/session yet.
+ * name/full_name/email come from Clerk (read-only here) — only app-specific
+ * preference fields are patchable.
  */
 import { mockStore } from "@/api/mocks/store";
 import { env } from "@/config/env";
@@ -87,9 +88,7 @@ function enrichWithLocalNotes(profile: UserProfile): UserProfile {
 
 function toBackendPatch(patch: Partial<UserProfile>): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if (patch.name !== undefined) body.name = patch.name;
-  if (patch.fullName !== undefined) body.full_name = patch.fullName;
-  if (patch.email !== undefined) body.email = patch.email;
+  // name/full_name/email are Clerk-owned and not patchable here.
   if (patch.occupation !== undefined) body.occupation = patch.occupation;
   if (patch.institution !== undefined) body.institution = patch.institution;
   if (patch.researchAreas !== undefined) body.research_areas = patch.researchAreas;
@@ -106,7 +105,7 @@ export async function getProfile(): Promise<UserProfile> {
   if (env.useMocks) {
     return mockStore.profile;
   }
-  const { data } = await apiClient.get<BackendProfile>("/api/v1/users/me");
+  const { data } = await apiClient.get<BackendProfile>("/api/v1/profile");
   return enrichWithLocalNotes(mapBackendProfile(data));
 }
 
@@ -119,7 +118,7 @@ export async function updateProfile(
     return next;
   }
   const { data } = await apiClient.patch<BackendProfile>(
-    "/api/v1/users/me",
+    "/api/v1/profile",
     toBackendPatch(patch),
   );
   return enrichWithLocalNotes(mapBackendProfile(data));

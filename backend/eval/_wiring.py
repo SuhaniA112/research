@@ -49,3 +49,7 @@ def build_chunk_repo(session: AsyncSession) -> ChunkRepository:
 
 def build_project_paper_repo(session: AsyncSession) -> ProjectPaperRepository:
     return ProjectPaperRepository(session)
+
+
+def build_project_repo(session: AsyncSession) -> ProjectRepository:
+    return ProjectRepository(session)

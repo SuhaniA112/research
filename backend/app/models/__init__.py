@@ -7,7 +7,6 @@ from app.models.project_paper import ProjectPaper
 from app.models.search_execution import SearchExecution
 from app.models.search_topic import SearchTopic
 from app.models.search_topic_paper import SearchTopicPaper
-from app.models.user import User
 
 __all__ = [
     "Base",
@@ -19,5 +18,4 @@ __all__ = [
     "SearchExecution",
     "SearchTopic",
     "SearchTopicPaper",
-    "User",
 ]

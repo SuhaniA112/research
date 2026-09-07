@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from app.core.auth import CurrentUser, get_display_identity
 from app.models.profile import Profile
 from app.repositories.profile_repo import ProfileRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
@@ -24,26 +25,35 @@ class ProfileService:
         self.project_repo = project_repo
         self.project_paper_repo = project_paper_repo
 
-    async def get_me(self) -> ProfileResponse:
-        profile = await self.profile_repo.ensure_singleton()
-        return await self._to_response(profile)
+    async def get_me(self, current_user: CurrentUser) -> ProfileResponse:
+        profile = await self.profile_repo.ensure_for_user(current_user.id)
+        return await self._to_response(profile, current_user)
 
-    async def update_me(self, payload: ProfileUpdate) -> ProfileResponse:
-        profile = await self.profile_repo.ensure_singleton()
+    async def update_me(
+        self, current_user: CurrentUser, payload: ProfileUpdate
+    ) -> ProfileResponse:
+        profile = await self.profile_repo.ensure_for_user(current_user.id)
         update_data = payload.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(profile, field, value)
         updated = await self.profile_repo.update(profile)
-        return await self._to_response(updated)
+        return await self._to_response(updated, current_user)
 
-    async def _to_response(self, profile: Profile) -> ProfileResponse:
-        projects_count = await self.project_repo.count_all()
-        sources_saved = await self.project_paper_repo.count_distinct_papers()
-        active = await self.project_repo.count_updated_since(_month_start_utc())
+    async def _to_response(
+        self, profile: Profile, current_user: CurrentUser
+    ) -> ProfileResponse:
+        identity = await get_display_identity(current_user)
+        projects_count = await self.project_repo.count_all(current_user.id)
+        sources_saved = await self.project_paper_repo.count_distinct_papers(
+            current_user.id
+        )
+        active = await self.project_repo.count_updated_since(
+            current_user.id, _month_start_utc()
+        )
         return ProfileResponse(
-            name=profile.name,
-            full_name=profile.full_name,
-            email=profile.email,
+            name=identity.name,
+            full_name=identity.full_name,
+            email=identity.email,
             occupation=profile.occupation,
             institution=profile.institution,
             member_since=_format_member_since(profile.created_at),

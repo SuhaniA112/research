@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from app.core.auth import CurrentUser
 from app.models.project import Project
 from app.repositories.project_paper_repo import ProjectPaperRepository
 from app.repositories.project_repo import ProjectRepository
@@ -38,30 +39,45 @@ class ProjectService:
                 # Prefer interest-profile topics; fall back to tags on saved papers.
                 topics=project.topics or paper_topics.get(project.id, []),
                 keywords=project.keywords or [],
-                reading_level=project.reading_level  # validated on create
-                if project.reading_level in ("casual", "graduate", "expert")
-                else "graduate",
+                reading_level=(
+                    project.reading_level  # validated on create
+                    if project.reading_level in ("casual", "graduate", "expert")
+                    else "graduate"
+                ),
             )
             for project in projects
         ]
 
-    async def get_project(self, project_id: UUID) -> ProjectResponse:
-        project = await self.project_repo.get_by_id(project_id)
+    async def get_owned_project(
+        self, project_id: UUID, current_user: CurrentUser
+    ) -> Project:
+        project = await self.project_repo.get_owned_by_id(project_id, current_user.id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project {project_id} not found",
             )
+        return project
+
+    async def get_project(
+        self, project_id: UUID, current_user: CurrentUser
+    ) -> ProjectResponse:
+        project = await self.get_owned_project(project_id, current_user)
         return await self._to_response(project)
 
     async def list_projects(
-        self, *, skip: int = 0, limit: int = 100
+        self, current_user: CurrentUser, *, skip: int = 0, limit: int = 100
     ) -> list[ProjectResponse]:
-        projects = await self.project_repo.list_all(skip=skip, limit=limit)
+        projects = await self.project_repo.list_all(
+            current_user.id, skip=skip, limit=limit
+        )
         return await self._to_responses(projects)
 
-    async def create_project(self, payload: ProjectCreate) -> ProjectResponse:
+    async def create_project(
+        self, current_user: CurrentUser, payload: ProjectCreate
+    ) -> ProjectResponse:
         project = Project(
+            user_id=current_user.id,
             name=payload.name,
             description=payload.description,
             topics=list(payload.topics),
@@ -71,13 +87,8 @@ class ProjectService:
         created = await self.project_repo.create(project)
         return await self._to_response(created)
 
-    async def delete_project(self, project_id: UUID) -> None:
-        project = await self.project_repo.get_by_id(project_id)
-        if project is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project {project_id} not found",
-            )
+    async def delete_project(self, project_id: UUID, current_user: CurrentUser) -> None:
+        project = await self.get_owned_project(project_id, current_user)
         await self.project_repo.delete(project)
 
     async def touch_project(self, project_id: UUID) -> None:

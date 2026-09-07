@@ -3,4 +3,6 @@ export const env = {
   appName: import.meta.env.VITE_APP_NAME ?? "PaperSearcher",
   devPort: Number(import.meta.env.VITE_DEV_PORT ?? "5173"),
   useMocks: (import.meta.env.VITE_USE_MOCKS ?? "true") !== "false",
+  authMode: (import.meta.env.VITE_AUTH_MODE ?? "mock") as "mock" | "clerk",
+  clerkPublishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ?? "",
 } as const;

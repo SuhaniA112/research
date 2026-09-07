@@ -5,28 +5,12 @@ import axios, {
 } from "axios";
 
 import { env } from "@/config/env";
-import { clearOnboardingComplete } from "@/lib/onboarding";
+import { getAuthToken } from "@/lib/auth";
 
-const TOKEN_STORAGE_KEY = "access_token";
-
-export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
-}
-
-export function setAccessToken(token: string): void {
-  clearOnboardingComplete();
-  localStorage.setItem(TOKEN_STORAGE_KEY, token);
-}
-
-export function clearAccessToken(): void {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  clearOnboardingComplete();
-}
-
-function attachAuthToken(
+async function attachAuthToken(
   config: InternalAxiosRequestConfig,
-): InternalAxiosRequestConfig {
-  const token = getAccessToken();
+): Promise<InternalAxiosRequestConfig> {
+  const token = await getAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -34,8 +18,7 @@ function attachAuthToken(
 }
 
 function handleResponseError(error: AxiosError): Promise<never> {
-  if (error.response?.status === 401) {
-    clearAccessToken();
+  if (error.response?.status === 401 && env.authMode === "clerk") {
     window.location.assign("/login");
   }
   return Promise.reject(error);

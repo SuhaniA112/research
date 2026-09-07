@@ -8,6 +8,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { getProfile, getResearchAreaOptions, updateProfile } from "@/api/profile";
 import { SelectionCard, StatCard } from "@/components/ui/StatCard";
@@ -15,12 +16,14 @@ import { ResearchAreaPicker } from "@/components/ui/ResearchAreaPicker";
 import { Tag } from "@/components/ui/Tag";
 import { Toggle } from "@/components/ui/Toggle";
 import { InputField } from "@/components/ui/InputField";
-import { clearAccessToken } from "@/lib/axios";
+import { useAuthState } from "@/lib/auth";
 import type { ReadingLevel, UserProfile } from "@/types";
 
 const AUTOSAVE_DEBOUNCE_MS = 450;
 
 export function ProfilePage() {
+  const navigate = useNavigate();
+  const { signOut } = useAuthState();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [allResearchAreas, setAllResearchAreas] = useState<string[]>([]);
   const [areas, setAreas] = useState<string[]>([]);
@@ -107,8 +110,9 @@ export function ProfilePage() {
     profile,
   ]);
 
-  function handleSignOut() {
-    clearAccessToken();
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login");
   }
 
   if (!profile) {

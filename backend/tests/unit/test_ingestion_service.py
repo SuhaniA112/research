@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.auth import CurrentUser
 from app.models.paper import Paper
 from app.schemas.indexing import PreparedChunk
 from app.schemas.research_papers import IndPaper
@@ -73,8 +74,10 @@ def _build_service(
     prepared_chunks: list[PreparedChunk] | None = None,
 ) -> tuple[IngestionService, dict[str, AsyncMock]]:
     project_id = uuid4()
+    current_user = CurrentUser(id="test-user")
     project = MagicMock()
     project.id = project_id
+    project.user_id = current_user.id
 
     paper_repo = AsyncMock()
     paper_repo.upsert_from_ind_paper.return_value = (paper, paper_created)
@@ -88,10 +91,13 @@ def _build_service(
 
     project_repo = AsyncMock()
     project_repo.get_by_id.return_value = project
+    project_repo.get_owned_by_id.return_value = project
 
     voyage = AsyncMock()
-    chunks = prepared_chunks if prepared_chunks is not None else _prepared_chunks(
-        str(paper.id)
+    chunks = (
+        prepared_chunks
+        if prepared_chunks is not None
+        else _prepared_chunks(str(paper.id))
     )
     voyage.embed.return_value = [[0.1] * 1024 for _ in chunks]
 
@@ -122,6 +128,7 @@ def _build_service(
         "paper_summarizer": paper_summarizer,
         "project_id": project_id,
         "prepared_chunks": chunks,
+        "current_user": current_user,
     }
     return service, mocks
 
@@ -139,7 +146,9 @@ async def test_newly_created_paper_is_indexed_and_linked() -> None:
     )
     paper_in = _ind_paper()
 
-    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+    result = await service.save_paper_to_project(
+        mocks["project_id"], paper_in, mocks["current_user"]
+    )
 
     mocks["paper_repo"].upsert_from_ind_paper.assert_awaited_once_with(paper_in)
     mocks["chunk_repo"].get_for_paper.assert_not_awaited()
@@ -174,7 +183,9 @@ async def test_existing_paper_with_chunks_skips_indexing() -> None:
     )
     paper_in = _ind_paper()
 
-    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+    result = await service.save_paper_to_project(
+        mocks["project_id"], paper_in, mocks["current_user"]
+    )
 
     mocks["paper_repo"].upsert_from_ind_paper.assert_awaited_once_with(paper_in)
     mocks["chunk_repo"].get_for_paper.assert_awaited_once_with(paper.id)
@@ -201,7 +212,9 @@ async def test_existing_paper_without_chunks_is_backfilled() -> None:
     )
     paper_in = _ind_paper()
 
-    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+    result = await service.save_paper_to_project(
+        mocks["project_id"], paper_in, mocks["current_user"]
+    )
 
     mocks["paper_repo"].upsert_from_ind_paper.assert_awaited_once_with(paper_in)
     mocks["chunk_repo"].get_for_paper.assert_awaited_once_with(paper.id)
@@ -233,7 +246,9 @@ async def test_already_linked_paper_sets_already_saved_and_skips_reindex() -> No
     )
     paper_in = _ind_paper()
 
-    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+    result = await service.save_paper_to_project(
+        mocks["project_id"], paper_in, mocks["current_user"]
+    )
 
     mocks["paper_repo"].upsert_from_ind_paper.assert_awaited_once_with(paper_in)
     mocks["chunk_repo"].get_for_paper.assert_awaited_once_with(paper.id)
@@ -261,7 +276,9 @@ async def test_voyage_failure_still_links_paper_to_project() -> None:
     mocks["voyage"].embed.side_effect = RuntimeError("voyage 403")
     paper_in = _ind_paper()
 
-    result = await service.save_paper_to_project(mocks["project_id"], paper_in)
+    result = await service.save_paper_to_project(
+        mocks["project_id"], paper_in, mocks["current_user"]
+    )
 
     mocks["project_paper_repo"].create_if_absent.assert_awaited_once_with(
         mocks["project_id"], paper.id

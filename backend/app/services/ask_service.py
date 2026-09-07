@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from app.core.auth import CurrentUser
 from app.models.chunk import Chunk
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.project_repo import ProjectRepository
@@ -38,9 +39,14 @@ class AskService:
         self.top_k = top_k
 
     async def ask(
-        self, project_id: UUID, question: str, *, debug: bool = False
+        self,
+        project_id: UUID,
+        question: str,
+        current_user: CurrentUser,
+        *,
+        debug: bool = False,
     ) -> AskResponse | tuple[AskResponse, list[UUID]]:
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_owned_by_id(project_id, current_user.id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

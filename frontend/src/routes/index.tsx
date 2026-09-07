@@ -1,8 +1,9 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
-import { getAccessToken } from "@/lib/axios";
+import { useAuthState } from "@/lib/auth";
 import { isOnboardingComplete } from "@/lib/onboarding";
 import { LoginPage } from "@/pages/LoginPage";
+import { SignUpPage } from "@/pages/SignUpPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { HubPage } from "@/pages/HubPage";
 import { AllProjectsPage } from "@/pages/AllProjectsPage";
@@ -20,16 +21,22 @@ import { ProtectedLayout } from "@/layouts/ProtectedLayout";
 import { OnboardingLayout } from "@/layouts/OnboardingLayout";
 
 function RequireAuth() {
-  const token = getAccessToken();
-  if (!token) {
+  const { isLoaded, isSignedIn } = useAuthState();
+  if (!isLoaded) {
+    return null;
+  }
+  if (!isSignedIn) {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;
 }
 
 function RedirectIfAuthenticated() {
-  const token = getAccessToken();
-  if (token) {
+  const { isLoaded, isSignedIn } = useAuthState();
+  if (!isLoaded) {
+    return null;
+  }
+  if (isSignedIn) {
     return <Navigate to="/dashboard" replace />;
   }
   return <Outlet />;
@@ -61,7 +68,8 @@ export function AppRoutes() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route element={<RedirectIfAuthenticated />}>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/*" element={<LoginPage />} />
+          <Route path="/sign-up/*" element={<SignUpPage />} />
         </Route>
       </Route>
 
