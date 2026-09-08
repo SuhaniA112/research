@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -238,7 +239,7 @@ async def test_force_refresh_calls_providers(repos, mock_voyage) -> None:
         external_id="ext-1",
     )
     paper_repo.upsert_from_ind_paper.return_value = (_paper(title=ind.title), True)
-    chunk_repo.get_for_paper.return_value = None
+    chunk_repo.get_for_papers.return_value = {}
     chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
     topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
 
@@ -272,9 +273,10 @@ async def test_low_similarity_triggers_fallback(repos, mock_voyage) -> None:
     topic_paper_repo.list_papers_for_topic.return_value = []
     topic_repo.mark_external_refresh.return_value = topic
     execution_repo.record.return_value = _execution(search_topic_id=topic.id)
-    paper_repo.upsert_from_ind_paper.return_value = (_paper(), False)
+    existing = _paper()
+    paper_repo.upsert_from_ind_paper.return_value = (existing, False)
     # Matching abstract avoids a re-embed path in the service.
-    chunk_repo.get_for_paper.return_value = MagicMock(text="a")
+    chunk_repo.get_for_papers.return_value = {existing.id: MagicMock(text="a")}
     topic_paper_repo.upsert_association.return_value = (MagicMock(), False)
 
     ind = IndPaper(
@@ -290,6 +292,7 @@ async def test_low_similarity_triggers_fallback(repos, mock_voyage) -> None:
     assert response.cache_hit is False
     assert response.cache_miss_reason == "low_similarity"
     assert response.external_search_performed is True
+    assert response.search_complete is True
 
 
 @pytest.mark.asyncio
@@ -307,7 +310,7 @@ async def test_stale_topic_triggers_refresh(repos, mock_voyage) -> None:
     topic_repo.mark_external_refresh.return_value = topic
     execution_repo.record.return_value = _execution(search_topic_id=topic.id)
     paper_repo.upsert_from_ind_paper.return_value = (papers[0], False)
-    chunk_repo.get_for_paper.return_value = MagicMock(text="a")
+    chunk_repo.get_for_papers.return_value = {papers[0].id: MagicMock(text="a")}
     topic_paper_repo.upsert_association.return_value = (MagicMock(), False)
 
     ind = IndPaper(
@@ -322,6 +325,7 @@ async def test_stale_topic_triggers_refresh(repos, mock_voyage) -> None:
 
     assert response.cache_miss_reason == "stale_topic"
     assert response.external_search_performed is True
+    assert response.search_complete is True
 
 
 @pytest.mark.asyncio
@@ -336,7 +340,7 @@ async def test_insufficient_results_triggers_fallback(repos, mock_voyage) -> Non
     topic_repo.mark_external_refresh.return_value = topic
     execution_repo.record.return_value = _execution(search_topic_id=topic.id)
     paper_repo.upsert_from_ind_paper.return_value = (_paper(), True)
-    chunk_repo.get_for_paper.return_value = None
+    chunk_repo.get_for_papers.return_value = {}
     chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
     topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
 
@@ -351,6 +355,7 @@ async def test_insufficient_results_triggers_fallback(repos, mock_voyage) -> Non
     )
 
     assert response.cache_miss_reason == "insufficient_results"
+    assert response.search_complete is True
 
 
 @pytest.mark.asyncio
@@ -376,7 +381,7 @@ async def test_provider_failure_does_not_abort_others(repos, mock_voyage) -> Non
         external_id="g1",
     )
     paper_repo.upsert_from_ind_paper.return_value = (_paper(title="Good"), True)
-    chunk_repo.get_for_paper.return_value = None
+    chunk_repo.get_for_papers.return_value = {}
     chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
     topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
 
@@ -424,6 +429,197 @@ async def test_repeated_searches_create_separate_executions(repos, mock_voyage) 
     assert r1.search_execution_id != r2.search_execution_id
     assert execution_repo.record.await_count == 2
     assert topic_repo.get_or_create_by_normalized_query.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_progressive_returns_db_candidates_before_external(
+    repos, mock_voyage
+) -> None:
+    """progressive=True + cache miss with DB hits → early page-1, no providers."""
+    paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos
+    settings = _settings(search_cache_min_results=5)
+    topic = _topic(
+        last_external_refresh_at=datetime.now(timezone.utc) - timedelta(days=30)
+    )
+    papers = [_paper(title=f"Cached {i}") for i in range(3)]
+
+    topic_repo.get_by_normalized_query.return_value = topic
+    chunk_repo.search_global.return_value = [(p, 0.1) for p in papers]
+    topic_paper_repo.list_papers_for_topic.return_value = []
+    execution_repo.record.return_value = _execution(search_topic_id=topic.id)
+
+    provider = ArxivClient(Exception("should not be called on early return"))
+    service = _build_service(repos, mock_voyage, settings, [provider])
+
+    response = await service.search(
+        DiscoverySearchRequest(
+            query="contextual retrieval", limit=5, progressive=True
+        )
+    )
+
+    assert response.search_complete is False
+    assert response.external_search_performed is False
+    assert response.providers_attempted == []
+    assert len(response.results) == 3
+    assert response.cache_miss_reason in ("stale_topic", "insufficient_results")
+    paper_repo.upsert_from_ind_paper.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_progressive_cold_start_still_calls_providers(repos, mock_voyage) -> None:
+    """progressive=True with empty DB must still run external search in one shot."""
+    paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos
+    settings = _settings()
+    topic = _topic(last_external_refresh_at=None)
+
+    topic_repo.get_by_normalized_query.return_value = None
+    topic_repo.find_similar.return_value = []
+    topic_repo.get_or_create_by_normalized_query.return_value = (topic, True)
+    chunk_repo.search_global.return_value = []
+    topic_paper_repo.list_papers_for_topic.return_value = []
+    topic_repo.mark_external_refresh.return_value = topic
+    execution_repo.record.return_value = _execution(search_topic_id=topic.id)
+
+    ind = IndPaper(
+        title="Fresh",
+        abstract="a",
+        authors=[],
+        year=2020,
+        source="arxiv",
+        external_id="f1",
+    )
+    paper_repo.upsert_from_ind_paper.return_value = (_paper(title="Fresh"), True)
+    chunk_repo.get_for_papers.return_value = {}
+    chunk_repo.get_for_paper.return_value = None
+    chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
+    topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
+
+    service = _build_service(repos, mock_voyage, settings, [ArxivClient([ind])])
+    response = await service.search(
+        DiscoverySearchRequest(
+            query="brand new obscure topic xyz", limit=5, progressive=True
+        )
+    )
+
+    assert response.search_complete is True
+    assert response.external_search_performed is True
+    assert len(response.results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_batched_embed_on_cache_miss(repos, mock_voyage) -> None:
+    """Multiple new papers should trigger a single batched document embed call."""
+    paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos
+    settings = _settings(search_cache_min_results=1)
+    topic = _topic()
+
+    topic_repo.get_by_normalized_query.return_value = topic
+    chunk_repo.search_global.return_value = []
+    topic_paper_repo.list_papers_for_topic.return_value = []
+    topic_repo.mark_external_refresh.return_value = topic
+    execution_repo.record.return_value = _execution(search_topic_id=topic.id)
+
+    inds = [
+        IndPaper(
+            title=f"Paper {i}",
+            abstract=f"abstract {i}",
+            authors=["A"],
+            year=2023,
+            source="arxiv",
+            external_id=f"ext-{i}",
+        )
+        for i in range(3)
+    ]
+    papers = [_paper(title=ind.title, abstract=ind.abstract) for ind in inds]
+    paper_repo.upsert_from_ind_paper.side_effect = [
+        (papers[0], True),
+        (papers[1], True),
+        (papers[2], True),
+    ]
+    chunk_repo.get_for_papers.return_value = {}
+    chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
+    topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
+
+    service = _build_service(repos, mock_voyage, settings, [ArxivClient(inds)])
+    await service.search(
+        DiscoverySearchRequest(query="contextual retrieval", force_refresh=True)
+    )
+
+    # One query embed + one batched document embed for all 3 papers.
+    assert mock_voyage.embed.await_count == 2
+    doc_call = mock_voyage.embed.await_args_list[1]
+    assert doc_call.kwargs.get("input_type") == "document"
+    assert len(doc_call.args[0]) == 3
+
+
+@pytest.mark.asyncio
+async def test_search_stream_yields_after_each_provider(repos, mock_voyage) -> None:
+    """Stream should emit DB/provider snapshots as each provider finishes."""
+    paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos
+    settings = _settings()
+    topic = _topic(last_external_refresh_at=None)
+
+    topic_repo.get_by_normalized_query.return_value = None
+    topic_repo.find_similar.return_value = []
+    topic_repo.get_or_create_by_normalized_query.return_value = (topic, True)
+    chunk_repo.search_global.return_value = []
+    topic_paper_repo.list_papers_for_topic.return_value = []
+    topic_repo.mark_external_refresh.return_value = topic
+    execution_repo.record.return_value = _execution(search_topic_id=topic.id)
+
+    slow = IndPaper(
+        title="Slow",
+        abstract="a",
+        authors=[],
+        year=2020,
+        source="openalex",
+        external_id="s1",
+    )
+    fast = IndPaper(
+        title="Fast",
+        abstract="a",
+        authors=[],
+        year=2020,
+        source="arxiv",
+        external_id="f1",
+    )
+
+    class SlowOpenAlex(OpenAlexClient):
+        async def search(self, query: str, max_results: int = 10):
+            await asyncio.sleep(0.05)
+            return [slow]
+
+    papers_by_title = {
+        "Fast": _paper(title="Fast"),
+        "Slow": _paper(title="Slow"),
+    }
+
+    async def upsert(ind):
+        return papers_by_title[ind.title], True
+
+    paper_repo.upsert_from_ind_paper.side_effect = upsert
+    chunk_repo.get_for_papers.return_value = {}
+    chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
+    topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
+
+    service = _build_service(
+        repos, mock_voyage, settings, [SlowOpenAlex([]), ArxivClient([fast])]
+    )
+    snapshots = []
+    async for snap in service.search_stream(
+        DiscoverySearchRequest(query="streaming topic", limit=5)
+    ):
+        snapshots.append(snap)
+
+    assert len(snapshots) >= 2
+    assert snapshots[-1].search_complete is True
+    titles_over_time = [
+        {item.paper.title for item in snap.results} for snap in snapshots
+    ]
+    # Fast provider should appear before or by the time slow joins the final set.
+    assert any("Fast" in titles for titles in titles_over_time)
+    assert "Fast" in titles_over_time[-1]
+    assert "Slow" in titles_over_time[-1]
 
 
 class TestCacheEvaluationHelpers:
