@@ -65,6 +65,18 @@ class ChunkRepository(BaseRepository[Chunk]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_for_papers(
+        self, paper_ids: list[UUID], *, chunk_index: int = 0
+    ) -> dict[UUID, Chunk]:
+        """Batch-load chunk_index rows for many papers (one query)."""
+        if not paper_ids:
+            return {}
+        stmt = select(Chunk).where(
+            Chunk.paper_id.in_(paper_ids), Chunk.chunk_index == chunk_index
+        )
+        result = await self.session.execute(stmt)
+        return {chunk.paper_id: chunk for chunk in result.scalars().all()}
+
     async def list_for_paper(self, paper_id: UUID) -> list[Chunk]:
         stmt = (
             select(Chunk)

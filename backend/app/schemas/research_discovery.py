@@ -17,12 +17,18 @@ class DiscoverySearchRequest(BaseModel):
     ``query`` may be empty when ``project_id`` is set — the backend builds the
     effective intent from the project's topics/keywords. Empty query with no
     usable project/profile context is rejected by the service.
+
+    ``progressive`` (default False) preserves the historical single-shot contract.
+    When True, a cache miss that already has usable DB candidates returns those
+    immediately with ``search_complete=False`` so the client can show page-1
+    results, then call again with ``force_refresh=True`` for external enrichment.
     """
 
     query: str = Field(default="", max_length=_MAX_QUERY_LENGTH)
     project_id: UUID | None = None
     limit: int | None = Field(default=None, ge=1, le=_MAX_LIMIT)
     force_refresh: bool = False
+    progressive: bool = False
 
     @model_validator(mode="after")
     def validate_query_or_project(self) -> "DiscoverySearchRequest":
@@ -71,4 +77,7 @@ class DiscoverySearchResponse(BaseModel):
     providers_succeeded: list[str] = Field(default_factory=list)
     providers_failed: list[ProviderFailure] = Field(default_factory=list)
     results: list[DiscoverySearchResultItem] = Field(default_factory=list)
+    # False when progressive mode returned early DB results and external
+    # enrichment is still needed (client should continue with force_refresh).
+    search_complete: bool = True
     searched_at: datetime | None = None

@@ -1,10 +1,14 @@
 import asyncio
 
+from app.core.logging import get_logger
 from app.schemas.research_papers import IndPaper, SearchResponse
 from app.services.research_sources.arxiv import ArxivClient
+from app.services.research_sources.base import ResearchSourceClient
 from app.services.research_sources.dblp import DblpClient
 from app.services.research_sources.openalex import OpenAlexClient
 from app.services.research_sources.semanticscholar import SemanticScholarClient
+
+logger = get_logger(__name__)
 
 # temporarily hardcoded, till we change it to be from user profile
 HARDCODED_SEARCH_QUERIES = [
@@ -13,9 +17,10 @@ HARDCODED_SEARCH_QUERIES = [
     "medical imaging",
 ]
 
+
 class ResearchService:
     def __init__(self) -> None:
-        self.clients = [
+        self.clients: list[ResearchSourceClient] = [
             ArxivClient(),
             OpenAlexClient(),
             SemanticScholarClient(),
@@ -23,20 +28,35 @@ class ResearchService:
         ]
 
     async def get_research_for_user(self) -> SearchResponse:
+        """Fan out hardcoded interests × providers concurrently.
+
+        Previously each call was sequential with a 1s sleep (very slow). Results
+        are still title-deduped the same way; only fetch concurrency changed.
+        """
         all_results: list[IndPaper] = []
+        lock = asyncio.Lock()
 
-        for query in HARDCODED_SEARCH_QUERIES:
-            for client in self.clients:
-                try:
-                    results = await client.search(query, max_results=5)
+        async def _one(query: str, client: ResearchSourceClient) -> None:
+            name = client.__class__.__name__
+            try:
+                results = await client.search(query, max_results=5)
+                async with lock:
                     all_results.extend(results)
-                except Exception as error:
-                    print(
-                        f"Error fetching from {client.__class__.__name__} "
-                        f"for query '{query}': {error}"
-                    )
+            except Exception as error:
+                logger.warning(
+                    "legacy_provider_failure provider=%s query=%r error=%s",
+                    name,
+                    query,
+                    error,
+                )
 
-                await asyncio.sleep(1)
+        await asyncio.gather(
+            *[
+                _one(query, client)
+                for query in HARDCODED_SEARCH_QUERIES
+                for client in self.clients
+            ]
+        )
 
         deduped_results = self._dedupe_results(all_results)
 
