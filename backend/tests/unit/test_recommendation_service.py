@@ -120,6 +120,17 @@ async def test_digest_cold_start_ranks_by_saved_papers() -> None:
 
 
 @pytest.mark.asyncio
+async def test_digest_survives_embedding_outage_using_saved_papers() -> None:
+    near, saved = _paper("near"), _paper("saved")
+    vectors = {near.id: [1, 0, 0], saved.id: [1, 0, 0]}
+    service, voyage, _ = _service([near, saved], vectors, saved=[saved])
+    voyage.embed.side_effect = RuntimeError("429 Too Many Requests")
+    result = await service.digest(SimpleNamespace(id=uuid4()))
+    assert result.method == "embedding"
+    assert result.items[0].relevance == 100
+
+
+@pytest.mark.asyncio
 async def test_related_skips_the_paper_itself() -> None:
     a, b = _paper("a"), _paper("b")
     service, _, _ = _service([a, b], {a.id: [1, 0, 0], b.id: [0.9, 0.1, 0]})

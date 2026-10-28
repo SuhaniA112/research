@@ -7,6 +7,7 @@ instead of live provider searches.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,8 @@ from app.models.user import User
 from app.schemas.paper import PaperResponse
 from app.schemas.recommendation import DigestResponse, RecommendedPaper
 from app.services.recommendation import ranking
+
+logger = logging.getLogger(__name__)
 
 MAX_INTERESTS = 8
 POOL_PER_QUERY = 25
@@ -157,13 +160,19 @@ class RecommendationService:
         if not getattr(self.voyage, "api_key", ""):
             return await self._rank_lexical(interests, exclude, now)
 
-        try:
-            term_vecs = np.asarray(await self._embed_queries(interests)) if interests else None
-        except Exception:  # noqa: BLE001 - embedding outage falls back to topics
-            return await self._rank_lexical(interests, exclude, now)
-
         saved_vecs = list((await self._paper_vectors(saved_ids)).values()) if saved_ids else []
         saved_centroid = ranking.centroid(saved_vecs) if saved_vecs else None
+
+        term_vecs = None
+        if interests:
+            try:
+                term_vecs = np.asarray(await self._embed_queries(interests))
+            except Exception as exc:  # noqa: BLE001 - e.g. Voyage rate limit
+                logger.warning("digest: embedding interests failed (%s)", exc)
+                if saved_centroid is None:
+                    return await self._rank_lexical(interests, exclude, now)
+                # Stored paper vectors need no API call: rank by saved papers instead.
+                interests = []
         if term_vecs is None:
             # Cold start (no interests yet): rank by closeness to what the user saved.
             if saved_centroid is None:
@@ -208,9 +217,11 @@ class RecommendationService:
             }
             for i in order
         ]
+        logger.info("digest: method=embedding candidates=%d", len(entries))
         return {"entries": entries, "method": "embedding", "generated_at": now}
 
     async def _rank_recent(self, exclude: set[UUID]) -> dict:
+        logger.info("digest: method=recent (no interests or matches)")
         papers = await self.paper_repo.list_recent(exclude=exclude, limit=MAX_RANKED)
         entries = [
             {"paper_id": p.id, "relevance": None, "similarity": None, "matched_interest": None}
@@ -227,6 +238,7 @@ class RecommendationService:
         hits = await self.paper_repo.find_by_topic_overlap(
             interests, exclude=exclude, limit=MAX_RANKED
         )
+        logger.info("digest: method=lexical (no embeddings available)")
         lowered = {t.casefold(): t for t in interests}
         entries = []
         for paper, _overlap in hits:
