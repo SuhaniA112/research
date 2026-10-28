@@ -81,7 +81,8 @@ Scripts live in `backend/eval/`; results go to `backend/eval/results/` (git-igno
    reports vector norms, anisotropy, effective dimensionality, hubness, a 2-D PCA layout of
    papers, and — with a golden set — relevant-vs-irrelevant similarity separation (ROC AUC)
    with a distance-threshold sweep for tuning `RETRIEVAL_MAX_DISTANCE`.
-4. **Weight tuning** — `npm run eval:tune -- --project-id <uuid> [--write]` scores the
+4. **Weight tuning** — `npm run eval:tune -- --project-id <uuid> [--distractors 50] [--write]` ranks
+   each question against the project's saved papers plus its 50 nearest unsaved papers, scores the
    golden set with the weighted relevance model (vector similarity + project fit +
    saved-paper similarity + recency + citations + topic overlap), grid-searches the
    weights, and reports raw-similarity baseline vs current vs tuned (leave-one-out).
