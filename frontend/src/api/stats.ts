@@ -188,9 +188,55 @@ function buildSourceRecencyStats(sources: Source[]): SourceRecencyStats | null {
   };
 }
 
+interface BackendProjectStats {
+  total_sources: number;
+  breakdown: { name: string; count: number; percent: number }[];
+  recency: {
+    bars: { year: number; count: number }[];
+    earliest_year: number;
+    total: number;
+    start_year: number;
+    present_year: number;
+  } | null;
+  validity: BackendSourceValidity;
+  topics: { topic: string; count: number }[];
+}
+
+// Only dedupes the cards' simultaneous requests; saves show up on the next visit.
+const STATS_TTL_MS = 5_000;
+const statsRequests = new Map<string, { at: number; promise: Promise<BackendProjectStats> }>();
+
+/** GET /projects/:id/stats once, shared by the three overview cards. */
+function getProjectStats(projectId: string): Promise<BackendProjectStats> {
+  const hit = statsRequests.get(projectId);
+  if (hit && Date.now() - hit.at < STATS_TTL_MS) return hit.promise;
+  const promise = apiClient
+    .get<BackendProjectStats>(`/api/v1/projects/${projectId}/stats`)
+    .then((r) => r.data);
+  statsRequests.set(projectId, { at: Date.now(), promise });
+  promise.catch(() => statsRequests.delete(projectId));
+  return promise;
+}
+
+export function invalidateProjectStats(projectId: string): void {
+  statsRequests.delete(projectId);
+}
+
 export async function getSourceBreakdown(
   projectId: string,
 ): Promise<SourceBreakdownItem[]> {
+  if (!env.useMocks) {
+    try {
+      const stats = await getProjectStats(projectId);
+      return stats.breakdown.map((item, index) => ({
+        name: item.name,
+        value: item.percent,
+        color: BREAKDOWN_COLORS[index] ?? colors.border,
+      }));
+    } catch {
+      // Fall through to the client-side calculation.
+    }
+  }
   const saved = await listSavedSources(projectId).catch(() => []);
   return buildSourceBreakdown(saved);
 }
@@ -221,8 +267,20 @@ export async function getSourceRecency(
     };
   }
 
-  const saved = await listSavedSources(projectId);
-  return buildSourceRecencyStats(saved);
+  try {
+    const { recency } = await getProjectStats(projectId);
+    if (!recency) return null;
+    return {
+      bars: recency.bars.map((b) => ({ year: String(b.year), count: b.count })),
+      earliestYear: recency.earliest_year,
+      total: recency.total,
+      startYear: recency.start_year,
+      presentYear: recency.present_year,
+    };
+  } catch {
+    const saved = await listSavedSources(projectId);
+    return buildSourceRecencyStats(saved);
+  }
 }
 
 export async function getSourceValidity(
@@ -242,10 +300,7 @@ export async function getSourceValidity(
     };
   }
   try {
-    const { data } = await apiClient.get<BackendSourceValidity>(
-      `/api/v1/projects/${projectId}/stats/validity`,
-    );
-    return mapSourceValidity(data);
+    return mapSourceValidity((await getProjectStats(projectId)).validity);
   } catch {
     return placeholderValidity("UNAVAILABLE");
   }

@@ -59,10 +59,10 @@ export function SourcePreviewCard({
           ) : null}
           <div className="mt-auto flex gap-2 pt-4">
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
-              {source.relevance == null ? "[X]% RELEVANT" : `${source.relevance}% RELEVANT`}
+              {source.relevance == null ? "— RELEVANT" : `${source.relevance}% RELEVANT`}
             </span>
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
-              {source.similarity == null ? "[X]% SIMILAR" : `${source.similarity}% SIMILAR`}
+              {source.similarity == null ? "— SIMILAR" : `${source.similarity}% SIMILAR`}
             </span>
           </div>
         </Link>

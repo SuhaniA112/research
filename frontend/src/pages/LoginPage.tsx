@@ -1,12 +1,20 @@
 import { setAccessToken } from "@/lib/axios";
 import { ensureCurrentUserId } from "@/lib/userContext";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Load the hub's code in the background so "Continue" feels instant.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void import("@/routes").then((m) => m.prefetchAppShell());
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, []);
 
   async function handleMockLogin() {
     setBusy(true);

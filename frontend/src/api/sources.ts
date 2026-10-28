@@ -278,9 +278,8 @@ export async function listRelatedSources(
   if (env.useMocks) {
     return mockStore.sources.filter((s) => s.id !== sourceId).slice(0, limit);
   }
-  void sourceId;
-  void limit;
-  return [];
+  const { fetchRelatedPapers } = await import("@/api/recommendations");
+  return fetchRelatedPapers(sourceId, limit).catch(() => []);
 }
 
 export async function listCitingSources(

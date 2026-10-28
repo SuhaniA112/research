@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
+import { withSimilarityToSaved } from "@/api/recommendations";
 import {
   recordSearch,
   rememberProjectSearchResults,
@@ -120,6 +121,12 @@ export function FindSourcesPage() {
         .then((sources) => {
           if (cancelled) return;
           setResults(sources);
+          // Fill "% similar to your saved papers" after first paint.
+          void withSimilarityToSaved(projectId, sources)
+            .then((scored) => {
+              if (!cancelled) setResults(scored);
+            })
+            .catch(() => undefined);
           setVisibleCount(3);
           if (search.trim()) {
             void rememberProjectSearchResults(projectId, sources);
