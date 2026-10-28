@@ -83,6 +83,9 @@ async def main() -> None:
     )
     args = parser.parse_args()
 
+    if not settings.openrouter_api_key.strip():
+        raise SystemExit("OPENROUTER_API_KEY is empty in backend/.env (a free key works).")
+
     papers = await sample_project_papers(args.project_id, args.count)
     if not papers:
         print(f"No papers saved to project {args.project_id}. Save some papers first.")
