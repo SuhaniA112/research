@@ -3,7 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
-import { fetchProjectSuggestions, scoreForProject } from "@/api/recommendations";
+import {
+  applyCachedProjectScores,
+  fetchProjectSuggestions,
+  scoreForProject,
+} from "@/api/recommendations";
 import {
   recordSearch,
   rememberProjectSearchResults,
@@ -132,7 +136,7 @@ export function FindSourcesPage() {
       void load
         .then((sources) => {
           if (cancelled) return;
-          setResults(sources);
+          setResults(applyCachedProjectScores(projectId, sources));
           // Score against this project (and the search) after first paint.
           void scoreForProject(projectId, sources, search)
             .then((scored) => {

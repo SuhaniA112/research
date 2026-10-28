@@ -53,6 +53,20 @@ def collect_interests(
     return out[:MAX_INTERESTS]
 
 
+def project_text(project) -> str:
+    """What a project is about, as one string for embedding."""
+    return ". ".join(
+        p
+        for p in (
+            project.name,
+            project.description or "",
+            ", ".join(project.topics or []),
+            ", ".join(project.keywords or []),
+        )
+        if p
+    )
+
+
 def _week_start() -> str:
     now = datetime.now(timezone.utc)
     return (now - timedelta(days=now.weekday())).date().isoformat()
@@ -72,7 +86,9 @@ class RecommendationService:
         chunk_repo,
         paper_repo,
         voyage_client,
+        project_embedding_repo=None,
     ) -> None:
+        self.project_embedding_repo = project_embedding_repo
         self.profile_repo = profile_repo
         self.project_repo = project_repo
         self.project_paper_repo = project_paper_repo
@@ -97,6 +113,28 @@ class RecommendationService:
             _embed_cache.move_to_end((model, t))
             out.append(_embed_cache[(model, t)])
         return out
+
+    async def _project_vector(self, project) -> np.ndarray | None:
+        """Stored project embedding; (re)computed only when the project's text changes.
+
+        Storing it keeps scores identical across pages and API restarts, and avoids
+        repeat embedding calls on rate-limited keys.
+        """
+        text = project_text(project)
+        repo = self.project_embedding_repo
+        row = await repo.get(project.id) if repo is not None else None
+        if row is not None and row.text == text:
+            return np.asarray(row.embedding, dtype=np.float64)
+        if getattr(self.voyage, "api_key", ""):
+            try:
+                vec = (await self._embed_queries([text]))[0]
+                if repo is not None:
+                    await repo.upsert(project.id, text, list(vec))
+                return np.asarray(vec, dtype=np.float64)
+            except Exception as exc:  # noqa: BLE001 - e.g. rate limit
+                logger.warning("project embedding failed (%s)", exc)
+        # Stale beats missing: the text changed but re-embedding failed.
+        return np.asarray(row.embedding, dtype=np.float64) if row is not None else None
 
     async def _paper_vectors(self, paper_ids: list[UUID]) -> dict[UUID, np.ndarray]:
         chunks = await self.chunk_repo.get_for_papers(paper_ids)
@@ -154,17 +192,22 @@ class RecommendationService:
             generated_at=ranked["generated_at"],
         )
 
-    async def _rank(self, interests: list[str], saved_ids: list[UUID]) -> dict:
+    async def _rank(
+        self,
+        interests: list[str],
+        saved_ids: list[UUID],
+        term_vecs: np.ndarray | None = None,
+    ) -> dict:
+        """Rank stored papers; ``term_vecs`` skips embedding when vectors are known."""
         now = datetime.now(timezone.utc)
         exclude = set(saved_ids)
-        if not getattr(self.voyage, "api_key", ""):
+        if term_vecs is None and not getattr(self.voyage, "api_key", ""):
             return await self._rank_lexical(interests, exclude, now)
 
         saved_vecs = list((await self._paper_vectors(saved_ids)).values()) if saved_ids else []
         saved_centroid = ranking.centroid(saved_vecs) if saved_vecs else None
 
-        term_vecs = None
-        if interests:
+        if term_vecs is None and interests:
             try:
                 term_vecs = np.asarray(await self._embed_queries(interests))
             except Exception as exc:  # noqa: BLE001 - e.g. Voyage rate limit
@@ -281,13 +324,12 @@ class RecommendationService:
 
     async def project_suggestions(self, project, *, limit: int = 10) -> list[RecommendedPaper]:
         """Stored papers that fit a project (its text + saved papers), excluding saved ones."""
-        project_text = ". ".join(
-            p for p in (project.name, project.description or "",
-                        ", ".join(project.topics or []), ", ".join(project.keywords or [])) if p
-        )
         saved = await self.project_paper_repo.list_papers_for_project(project.id)
         saved_ids = sorted(p.id for p in saved)
-        ranked = await self._rank([project_text], saved_ids)
+        vec = await self._project_vector(project)
+        ranked = await self._rank(
+            [project_text(project)], saved_ids, vec[None, :] if vec is not None else None
+        )
         if not ranked["entries"]:
             ranked = await self._rank_recent(set(saved_ids))
         page = ranked["entries"][:limit]
@@ -311,25 +353,14 @@ class RecommendationService:
         if not targets:
             return out
 
-        project_text = ". ".join(
-            part
-            for part in (
-                project.name,
-                project.description or "",
-                ", ".join(project.topics or []),
-                ", ".join(project.keywords or []),
-            )
-            if part
-        )
-        texts = [project_text] + ([query.strip()] if query and query.strip() else [])
-        project_vec = query_vec = None
-        if getattr(self.voyage, "api_key", ""):
+        raw = await self._project_vector(project)
+        project_vec = ranking.unit(raw)[0] if raw is not None else None
+        query_vec = None
+        if query and query.strip() and getattr(self.voyage, "api_key", ""):
             try:
-                vecs = await self._embed_queries(texts)
-                project_vec = ranking.unit(vecs[0])[0]
-                query_vec = ranking.unit(vecs[1])[0] if len(vecs) > 1 else None
+                query_vec = ranking.unit((await self._embed_queries([query.strip()]))[0])[0]
             except Exception as exc:  # noqa: BLE001 - rate limits etc.
-                logger.warning("project scores: embedding failed (%s)", exc)
+                logger.warning("project scores: query embedding failed (%s)", exc)
 
         saved = await self.project_paper_repo.list_papers_for_project(project.id)
         saved_vecs = await self._paper_vectors([p.id for p in saved])

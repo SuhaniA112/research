@@ -7,6 +7,7 @@ import { listProjects } from "@/api/projects";
 import {
   fetchDigestPage,
   readDigestSnapshot,
+  applyCachedProjectScores,
   scoreForProject,
   writeDigestSnapshot,
   type DigestPage,
@@ -122,12 +123,17 @@ export function HubPage() {
   useEffect(() => {
     if (env.useMocks || !projectId || !digest?.items.length) return;
     let cancelled = false;
+    // Drop interest-based scores so only project scores are ever shown.
+    setDigest((d) => (d ? { ...d, items: applyCachedProjectScores(projectId, d.items) } : d));
     void scoreForProject(projectId, digest.items)
       .then((scored) => {
         if (cancelled) return;
-        setDigest((d) =>
-          d && d.items.map((s) => s.id).join(",") === itemIds ? { ...d, items: scored } : d,
-        );
+        setDigest((d) => {
+          if (!d || d.items.map((s) => s.id).join(",") !== itemIds) return d;
+          const next = { ...d, items: scored };
+          writeDigestSnapshot(next);
+          return next;
+        });
       })
       .catch(() => undefined);
     return () => {

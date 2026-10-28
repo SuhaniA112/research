@@ -11,6 +11,7 @@ from app.core.database import get_async_session
 from app.models.user import User
 from app.repositories.chunk_repo import ChunkRepository
 from app.repositories.paper_repo import PaperRepository
+from app.repositories.project_embedding_repo import ProjectEmbeddingRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
 from app.repositories.project_repo import ProjectRepository
 from app.repositories.search_execution_repo import SearchExecutionRepository
@@ -275,9 +276,16 @@ def get_recommendation_service(
     chunk_repo: ChunkRepoDep,
     paper_repo: PaperRepoDep,
     voyage_client: VoyageClientDep,
+    session: DbSession,
 ) -> RecommendationService:
     return RecommendationService(
-        profile_repo, project_repo, project_paper_repo, chunk_repo, paper_repo, voyage_client
+        profile_repo,
+        project_repo,
+        project_paper_repo,
+        chunk_repo,
+        paper_repo,
+        voyage_client,
+        project_embedding_repo=ProjectEmbeddingRepository(session),
     )
 
 

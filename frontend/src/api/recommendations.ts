@@ -121,6 +121,28 @@ interface BackendPaperScore {
   score: number | null;
 }
 
+type ProjectScore = Pick<Source, "relevance" | "similarity">;
+const projectScoreCache = new Map<string, ProjectScore>();
+const scoreKey = (projectId: string, paperId: string) => `${projectId}:${paperId}`;
+
+/**
+ * Show only project-relative scores: last known values from the cache, else
+ * none. Keeps the numbers identical across hub, search, saved and detail pages.
+ * The previous search relevance is kept in matchScore so ordering doesn't jump.
+ */
+export function applyCachedProjectScores(projectId: string | undefined, sources: Source[]): Source[] {
+  if (!projectId || !isPaperUuid(projectId)) return sources;
+  return sources.map((s) => {
+    const cached = projectScoreCache.get(scoreKey(projectId, s.id));
+    return {
+      ...s,
+      matchScore: s.matchScore ?? (s.relevance != null ? s.relevance / 100 : null),
+      relevance: cached?.relevance ?? null,
+      similarity: cached?.similarity ?? null,
+    };
+  });
+}
+
 /**
  * Score sources against a project: relevance = fit to the project,
  * similarity = closeness to its saved papers, matchScore = ranking blend
@@ -142,12 +164,14 @@ export async function scoreForProject(
     sources.map((s) => {
       const sc = data.scores[s.id];
       if (!sc) return s;
-      return {
-        ...s,
-        relevance: sc.relevance ?? s.relevance,
-        similarity: sc.similarity ?? s.similarity,
-        matchScore: sc.score ?? s.matchScore ?? null,
+      const key = scoreKey(projectId, s.id);
+      const prev = projectScoreCache.get(key);
+      const next = {
+        relevance: sc.relevance ?? prev?.relevance ?? null,
+        similarity: sc.similarity ?? prev?.similarity ?? null,
       };
+      projectScoreCache.set(key, next);
+      return { ...s, ...next, matchScore: sc.score ?? s.matchScore ?? null };
     }),
   );
 }

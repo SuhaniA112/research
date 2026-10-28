@@ -133,10 +133,10 @@ async def test_digest_survives_embedding_outage_using_saved_papers() -> None:
 @pytest.mark.asyncio
 async def test_project_scores_use_project_text_query_and_saved() -> None:
     a, s = _paper("a"), _paper("s")
-    # Project text embeds like "vision" ([1,0,0]); query "nlp" -> [0,1,0].
+    # Project text "Vision" -> [1,0,0]; query "nlp" -> [0,1,0].
     service, voyage, _ = _service([a, s], {a.id: [1, 0, 0], s.id: [0, 1, 0]}, saved=[s])
     voyage.embed.side_effect = lambda texts, **kw: [
-        [1.0, 0.0, 0.0] if i == 0 else [0.0, 1.0, 0.0] for i, _ in enumerate(texts)
+        [1.0, 0.0, 0.0] if t == "Vision" else [0.0, 1.0, 0.0] for t in texts
     ]
     project = SimpleNamespace(id=uuid4(), name="Vision", description="", topics=[], keywords=[])
     scores = await service.project_scores(project, [a.id, s.id], query="nlp")
@@ -154,6 +154,25 @@ async def test_project_suggestions_exclude_saved_and_fall_back() -> None:
     suggestions = await service.project_suggestions(project, limit=5)
     assert [r.paper.id for r in suggestions] == [a.id]
     assert suggestions[0].relevance is not None
+
+
+@pytest.mark.asyncio
+async def test_project_vector_is_stored_and_reused() -> None:
+    a = _paper("a")
+    service, voyage, _ = _service([a], {a.id: [1, 0, 0]})
+    repo = AsyncMock()
+    repo.get.return_value = SimpleNamespace(text="Vision", embedding=[1.0, 0.0, 0.0])
+    service.project_embedding_repo = repo
+    project = SimpleNamespace(id=uuid4(), name="Vision", description="", topics=[], keywords=[])
+
+    scores = await service.project_scores(project, [a.id])
+    assert scores[str(a.id)].relevance == 100
+    voyage.embed.assert_not_awaited()  # stored vector, no API call
+
+    project.description = "now about language"
+    await service.project_scores(project, [a.id])
+    voyage.embed.assert_awaited_once()  # text changed -> re-embed and store
+    repo.upsert.assert_awaited_once()
 
 
 @pytest.mark.asyncio

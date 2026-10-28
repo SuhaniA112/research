@@ -11,7 +11,7 @@ import {
 } from "@/api/notes";
 import { cacheSource } from "@/api/mappers";
 import { getProject } from "@/api/projects";
-import { scoreForProject } from "@/api/recommendations";
+import { applyCachedProjectScores, isPaperUuid, scoreForProject } from "@/api/recommendations";
 import {
   ensureSourceSummaries,
   getSource,
@@ -95,7 +95,13 @@ export function SourceDetailPage() {
     void getSource(sourceId).then((s) => {
       if (s) {
         setSource(s);
-        setScores(null);
+        // Same numbers the list page showed, then refreshed.
+        const [cached] = applyCachedProjectScores(projectId, [s]);
+        setScores(
+          isPaperUuid(projectId) && cached
+            ? { relevance: cached.relevance, similarity: cached.similarity }
+            : null,
+        );
         void scoreForProject(projectId, [s])
           .then(([scored]) => {
             if (scored) setScores({ relevance: scored.relevance, similarity: scored.similarity });
@@ -362,7 +368,7 @@ export function SourceDetailPage() {
         <div className="space-y-6">
           <div className="overflow-hidden rounded-xl border border-gray-200">
             <SourceMetricsPanel
-              source={scores ? { ...source, relevance: scores.relevance ?? source.relevance, similarity: scores.similarity ?? source.similarity } : source}
+              source={scores ? { ...source, ...scores } : source}
               className="w-full border-l-0"
             />
           </div>
