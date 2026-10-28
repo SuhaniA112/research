@@ -30,6 +30,10 @@ export interface Source {
   publicationUrl: string;
   externalId?: string;
   pdfUrl?: string | null;
+  /** Journal / conference, when the provider reports one. */
+  venue?: string | null;
+  openAccess?: boolean | null;
+  peerReviewed?: boolean | null;
   starred?: boolean;
   savedOn?: string;
 }

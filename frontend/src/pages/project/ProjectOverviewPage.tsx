@@ -27,6 +27,34 @@ import { getIconSizeClass, IconButton } from "@/components/ui/IconButton";
 import { getFindSourcesPath } from "@/lib/sourcePaths";
 import type { Project, Source } from "@/types";
 
+const VALIDITY_PLACEHOLDER: SourceValidityStats["metrics"] = [
+  "Cross-cited",
+  "Peer-reviewed",
+  "Open access",
+  "Multi-author",
+].map((label) => ({ label, value: "—", hint: "" }));
+
+/** Half-circle gauge whose filled arc tracks the 0–100 validity score. */
+function ValidityGauge({ score }: { score: number | null }) {
+  const arc = "M 10 50 A 40 40 0 0 1 90 50";
+  const fraction = score == null ? 0 : Math.max(0, Math.min(score, 100)) / 100;
+  return (
+    <svg viewBox="0 0 100 55" className="h-20 w-40" aria-hidden="true">
+      <path d={arc} fill="none" strokeWidth={8} className="stroke-gray-200" />
+      {fraction > 0 ? (
+        <path
+          d={arc}
+          fill="none"
+          strokeWidth={8}
+          pathLength={100}
+          strokeDasharray={`${fraction * 100} 100`}
+          className="stroke-metrics"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 export function ProjectOverviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const invalidateSearchHistory = useInvalidateSearchHistory();
@@ -145,35 +173,23 @@ export function ProjectOverviewPage() {
             subtitle="How connected & cross-referenced your sources are"
           >
             <div className="flex flex-col items-center">
-              <div className="relative h-20 w-40 overflow-hidden">
-                <div className="absolute inset-0 rounded-t-full border-8 border-gray-200" />
-                {validity && !validity.scoreLabel.includes("[X]") ? (
-                  <div
-                    className="absolute inset-0 rounded-t-full border-8 border-metrics"
-                    style={{ clipPath: "inset(0 0 50% 0)" }}
-                  />
-                ) : null}
-              </div>
+              <ValidityGauge score={validity?.score ?? null} />
               <p className="text-2xl font-bold">
-                {validity?.scoreLabel ?? "[X] / 100"}
+                {validity?.scoreLabel ?? "— / 100"}
               </p>
               <p className="text-xs font-semibold text-metrics">
-                {validity?.statusLabel ?? "PENDING METRICS"}
+                {validity?.statusLabel ?? "LOADING"}
               </p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {(
-                validity?.metrics ??
-                ([
-                  ["Cross-cited", "[X]%"],
-                  ["Peer-reviewed", "[X]%"],
-                  ["Open access", "[X]%"],
-                  ["Multi-author", "[X]%"],
-                ] as [string, string][])
-              ).map(([label, value]) => (
-                <div key={label} className="rounded-lg bg-white p-2 text-center">
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="text-sm font-semibold">{value}</p>
+              {(validity?.metrics ?? VALIDITY_PLACEHOLDER).map((metric) => (
+                <div
+                  key={metric.label}
+                  className="rounded-lg bg-white p-2 text-center"
+                  title={metric.hint || undefined}
+                >
+                  <p className="text-xs text-gray-500">{metric.label}</p>
+                  <p className="text-sm font-semibold">{metric.value}</p>
                 </div>
               ))}
             </div>

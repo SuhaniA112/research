@@ -6,6 +6,7 @@ from app.api.deps import AskServiceDep, CurrentUserDep, IngestionServiceDep, Pro
 from app.schemas.ask import AskRequest, AskResponse
 from app.schemas.paper import PaperResponse, SavePaperRequest, SavePaperResponse
 from app.schemas.project import ProjectCreate, ProjectResponse
+from app.schemas.stats import SourceValidityResponse
 
 router = APIRouter()
 
@@ -55,6 +56,17 @@ async def list_project_papers(
     current_user: CurrentUserDep,
 ) -> list[PaperResponse]:
     return await service.list_papers_for_project(project_id, current_user.id)
+
+
+@router.get(
+    "/{project_id}/stats/validity", response_model=SourceValidityResponse
+)
+async def get_source_validity(
+    project_id: UUID,
+    service: IngestionServiceDep,
+    current_user: CurrentUserDep,
+) -> SourceValidityResponse:
+    return await service.get_source_validity(project_id, current_user.id)
 
 
 @router.post(

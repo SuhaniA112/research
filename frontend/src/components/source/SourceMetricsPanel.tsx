@@ -62,7 +62,7 @@ export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPane
       <div className="mt-5">
         <p className="text-xs font-semibold tracking-wide text-gray-500">IMPACT</p>
         <p className="mt-1 text-xs text-gray-600">
-          {source.citations == null ? "[X]" : source.citations} Citations
+          {source.citations == null ? "—" : source.citations.toLocaleString()} Citations
         </p>
         <p className="mt-1 text-xs text-gray-600">
           Cites {source.citesSaved == null ? "[X]" : source.citesSaved} sources you have saved.

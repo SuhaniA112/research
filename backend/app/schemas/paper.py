@@ -33,6 +33,10 @@ class PaperResponse(BaseModel):
     pdf_url: str | None
     topics: list[str]
     source_categories: list[str] = Field(default_factory=list)
+    citation_count: int | None = None
+    venue: str | None = None
+    is_open_access: bool | None = None
+    is_peer_reviewed: bool | None = None
     summary_general: str | None = None
     summary_graduate: str | None = None
     summary_expert: str | None = None

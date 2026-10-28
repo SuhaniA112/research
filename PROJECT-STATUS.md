@@ -1,7 +1,7 @@
 # PaperSearcher — Project Status
 
 This document describes what exists on `main` / current wiring branches today
-and what remains to be done. Updated 2026-08-04.
+and what remains to be done. Updated 2026-10-28.
 
 ## What exists
 
@@ -28,6 +28,18 @@ FastAPI + async SQLAlchemy + Postgres (pgvector). Schema is applied with **Alemb
 - `POST /projects/{id}/ask` — retrieval + OpenRouter answer with citations
 - Offline eval harness under `backend/eval/`
 
+**Summaries / key findings**
+
+- `POST /api/v1/papers/summarize` — leveled summaries (general / graduate / expert) + key findings
+
+**Source validity stats**
+
+- Providers now report `citation_count`, `venue`, `is_open_access`, `is_peer_reviewed`
+  on papers (migration `0009`; NULL = provider did not say; fills in on next refresh)
+- `GET /api/v1/projects/{id}/stats/validity` — Cross-cited / Peer-reviewed / Open access /
+  Multi-author percentages over saved papers (each counted only over papers with data),
+  plus a 0–100 score and status label. Logic in `app/services/source_validity.py`
+
 **Auth**
 
 - `User` model / CRUD by UUID exists; **no** login/session/`/users/me` yet
@@ -47,14 +59,13 @@ React app talks to the API through `frontend/src/api/*` adapters.
 1. **API keys + E2E** — set real `VOYAGE_API_KEY` / `OPENROUTER_API_KEY` in `backend/.env`,
    run API, then `backend/.venv/bin/python scripts/e2e_save_ask.py`
    (ask is API-only for verification; **no Ask UI** — out of product scope)
-2. **Auth** — login/session, `/users/me`, scope projects by `user_id`
-3. **Summaries / digest** — leveled AI summaries + hub digest still need backends (or hide)
-4. **Stats / related / key findings** — breakdown/validity still placeholders; related/cites empty
-5. **Persist project create fields** — topics/keywords/reading level dropped on create
-6. **Profile password actions** — Change password / Delete account unfinished
-7. **Page-level ask citations** — persist `page_number` / `content_type` on chunks (ADR 0002);
-   only relevant if ask stays API/eval-only
-8. **HNSW** on `Chunk.embedding` when row counts grow (~10k+)
+2. **Auth** — in progress on `auth-clerk-migration` (Clerk); login/session, `/users/me`,
+   scope projects by `user_id`
+3. **Relevance / similarity %** — source cards still show `[X]%` badges
+4. **Related / citing papers** — source detail lists are empty
+5. **Profile password actions** — Change password / Delete account unfinished (depends on auth)
+6. **Validity backfill (optional)** — papers saved before migration `0009` only get
+   citation / venue / OA / peer-review data when a search re-fetches them
 
 ### Out of scope
 

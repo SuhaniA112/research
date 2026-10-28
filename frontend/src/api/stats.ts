@@ -1,5 +1,6 @@
 import { listSavedSources } from "@/api/sources";
 import { env } from "@/config/env";
+import { apiClient } from "@/lib/axios";
 import { sourceRecency } from "@/data/mockData";
 import { colors } from "@/lib/theme";
 import type { Source } from "@/types";
@@ -26,10 +27,60 @@ export interface SourceRecencyStats {
   presentYear: number;
 }
 
+export interface SourceValidityMetric {
+  label: string;
+  /** Display value, e.g. "76%"; "—" when no provider reported the field. */
+  value: string;
+  /** e.g. "12 of 16 sources with data". */
+  hint: string;
+}
+
 export interface SourceValidityStats {
+  /** 0–100, or null when there is nothing to score yet. */
+  score: number | null;
   scoreLabel: string;
   statusLabel: string;
-  metrics: [string, string][];
+  metrics: SourceValidityMetric[];
+}
+
+interface BackendSourceValidity {
+  score: number | null;
+  status: string;
+  total_sources: number;
+  metrics: {
+    key: string;
+    label: string;
+    percent: number | null;
+    count: number;
+    known: number;
+  }[];
+}
+
+const VALIDITY_LABELS = ["Cross-cited", "Peer-reviewed", "Open access", "Multi-author"];
+
+function placeholderValidity(statusLabel: string): SourceValidityStats {
+  return {
+    score: null,
+    scoreLabel: "— / 100",
+    statusLabel,
+    metrics: VALIDITY_LABELS.map((label) => ({ label, value: "—", hint: "" })),
+  };
+}
+
+export function mapSourceValidity(data: BackendSourceValidity): SourceValidityStats {
+  return {
+    score: data.score,
+    scoreLabel: data.score == null ? "— / 100" : `${data.score} / 100`,
+    statusLabel: data.status,
+    metrics: data.metrics.map((m) => ({
+      label: m.label,
+      value: m.percent == null ? "—" : `${m.percent}%`,
+      hint:
+        m.known === 0
+          ? "Not reported by these sources' providers yet"
+          : `${m.count} of ${m.known} source${m.known === 1 ? "" : "s"} with data`,
+    })),
+  };
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -177,27 +228,25 @@ export async function getSourceRecency(
 export async function getSourceValidity(
   projectId: string,
 ): Promise<SourceValidityStats> {
-  void projectId;
   if (env.useMocks) {
     return {
+      score: 82,
       scoreLabel: "82 / 100",
       statusLabel: "HIGHLY CONNECTED",
       metrics: [
-        ["Cross-cited", "76%"],
-        ["Peer-reviewed", "68%"],
-        ["Open access", "54%"],
-        ["Multi-author", "89%"],
+        { label: "Cross-cited", value: "76%", hint: "" },
+        { label: "Peer-reviewed", value: "68%", hint: "" },
+        { label: "Open access", value: "54%", hint: "" },
+        { label: "Multi-author", value: "89%", hint: "" },
       ],
     };
   }
-  return {
-    scoreLabel: "[X] / 100",
-    statusLabel: "PENDING METRICS",
-    metrics: [
-      ["Cross-cited", "[X]%"],
-      ["Peer-reviewed", "[X]%"],
-      ["Open access", "[X]%"],
-      ["Multi-author", "[X]%"],
-    ],
-  };
+  try {
+    const { data } = await apiClient.get<BackendSourceValidity>(
+      `/api/v1/projects/${projectId}/stats/validity`,
+    );
+    return mapSourceValidity(data);
+  } catch {
+    return placeholderValidity("UNAVAILABLE");
+  }
 }

@@ -37,6 +37,10 @@ interface IndPaper {
   source: string;
   external_id?: string | null;
   topics?: string[];
+  citation_count?: number | null;
+  venue?: string | null;
+  is_open_access?: boolean | null;
+  is_peer_reviewed?: boolean | null;
 }
 
 interface LegacySearchResponse {
@@ -96,6 +100,10 @@ function indPaperToBackendPaper(paper: IndPaper, index: number): BackendPaper {
     url: paper.url,
     pdf_url: paper.pdf_url,
     topics: paper.topics,
+    citation_count: paper.citation_count,
+    venue: paper.venue,
+    is_open_access: paper.is_open_access,
+    is_peer_reviewed: paper.is_peer_reviewed,
   };
 }
 

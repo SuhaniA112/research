@@ -55,6 +55,10 @@ class ArxivClient(ResearchSourceClient):
             )
             topics = build_paper_topics(source_categories=source_categories)
 
+            # arXiv is open access by definition. A journal_ref means the
+            # preprint has since been published in a (peer-reviewed) venue.
+            journal_ref = (getattr(entry, "arxiv_journal_ref", None) or "").strip()
+
             results.append(
                 IndPaper(
                     title=entry.title.replace("\n", " ").strip(),
@@ -67,6 +71,10 @@ class ArxivClient(ResearchSourceClient):
                     external_id=entry.id.split("/")[-1],
                     topics=topics,
                     source_categories=source_categories,
+                    citation_count=None,
+                    venue=journal_ref or "arXiv",
+                    is_open_access=True,
+                    is_peer_reviewed=bool(journal_ref),
                 )
             )
 
