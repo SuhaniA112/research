@@ -57,7 +57,8 @@ class ArxivClient(ResearchSourceClient):
 
             # arXiv is open access by definition. A journal_ref means the
             # preprint has since been published in a (peer-reviewed) venue.
-            journal_ref = (getattr(entry, "arxiv_journal_ref", None) or "").strip()
+            journal_ref = getattr(entry, "arxiv_journal_ref", None)
+            journal_ref = journal_ref.strip() if isinstance(journal_ref, str) else ""
 
             results.append(
                 IndPaper(
