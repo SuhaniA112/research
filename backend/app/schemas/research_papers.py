@@ -16,6 +16,11 @@ class IndPaper(BaseModel):
     topics: list[str] = Field(default_factory=list)
     # Raw provider taxonomy codes (e.g. arXiv cs.CV). Never treat as display chips.
     source_categories: list[str] = Field(default_factory=list)
+    # Source-validity metadata. None means the provider did not report it.
+    citation_count: int | None = None
+    venue: str | None = None
+    is_open_access: bool | None = None
+    is_peer_reviewed: bool | None = None
 
     @field_validator("title", mode="before")
     @classmethod

@@ -1,7 +1,7 @@
 {
   "name": "papersearcher",
   "private": true,
-  "description": "PaperSearcher monorepo — run setup once, then npm run dev",
+  "description": "PaperSearcher monorepo \u2014 run setup once, then npm run dev",
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "node scripts/dev.mjs",
@@ -11,7 +11,12 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
-    "e2e": "backend/.venv/bin/python scripts/e2e_save_ask.py"
+    "e2e": "node scripts/py.mjs scripts/e2e_save_ask.py",
+    "eval": "node scripts/py.mjs --backend -m eval.run_eval",
+    "eval:golden": "node scripts/py.mjs --backend -m eval.generate_golden_set",
+    "eval:diagnostics": "node scripts/py.mjs --backend -m eval.diagnose_embeddings",
+    "eval:report": "node scripts/py.mjs --backend -m eval.report",
+    "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

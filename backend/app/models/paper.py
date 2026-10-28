@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ARRAY, Integer, String, Text, UniqueConstraint
+from sqlalchemy import ARRAY, Boolean, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,11 @@ class Paper(Base, TimestampMixin):
     source_categories: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list
     )
+    # Source-validity metadata from providers. None = provider did not say.
+    citation_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    venue: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_open_access: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_peer_reviewed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     summary_general: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_graduate: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_expert: Mapped[str | None] = mapped_column(Text, nullable=True)

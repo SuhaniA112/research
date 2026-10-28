@@ -29,3 +29,6 @@ frontend/dist/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+
+# Eval outputs (JSON results + HTML report)
+backend/eval/results/

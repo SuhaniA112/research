@@ -11,9 +11,11 @@ from app.repositories.project_paper_repo import ProjectPaperRepository
 from app.repositories.project_repo import ProjectRepository
 from app.schemas.paper import PaperResponse, SavePaperResponse
 from app.schemas.research_papers import IndPaper
+from app.schemas.stats import SourceValidityResponse
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
 from app.services.indexing.paper_indexer import PaperIndexer
 from app.services.summarization.paper_summarizer import PaperSummarizer
+from app.services.source_validity import compute_source_validity
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +213,18 @@ class IngestionService:
             )
         papers = await self.project_paper_repo.list_papers_for_project(project_id)
         return [PaperResponse.model_validate(paper) for paper in papers]
+
+    async def get_source_validity(
+        self, project_id: UUID, user_id: UUID
+    ) -> SourceValidityResponse:
+        project = await self.project_repo.get_for_user(project_id, user_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project {project_id} not found",
+            )
+        papers = await self.project_paper_repo.list_papers_for_project(project_id)
+        return compute_source_validity(papers)
 
     async def unsave_paper_from_project(
         self, project_id: UUID, paper_id: UUID, user_id: UUID

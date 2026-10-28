@@ -4,13 +4,11 @@
  */
 import { execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createConnection } from "node:net";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const concurrently = join(root, "node_modules", ".bin", "concurrently");
-const uvicorn = join(root, "backend", ".venv", "bin", "uvicorn");
+import { nodeBin, q, root, venvPython } from "./platform.mjs";
+
+const concurrently = nodeBin("concurrently");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -35,7 +33,7 @@ async function waitForPostgres(timeoutMs = 60_000) {
   throw new Error("Postgres did not become ready on :5432");
 }
 
-if (!existsSync(uvicorn)) {
+if (!existsSync(venvPython)) {
   console.error("Backend not set up yet. Run once:\n  npm run setup\n");
   process.exit(1);
 }
@@ -66,8 +64,9 @@ try {
 }
 console.log("Postgres is up.\n");
 
+// shell: true so Windows can run the concurrently.cmd shim; quote for spaces.
 const child = spawn(
-  concurrently,
+  q(concurrently),
   [
     "-n",
     "api,web",

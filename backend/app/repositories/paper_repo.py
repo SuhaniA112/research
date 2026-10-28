@@ -71,6 +71,8 @@ class PaperRepository(BaseRepository[Paper]):
         if incoming.pdf_url and not existing.pdf_url:
             updates["pdf_url"] = incoming.pdf_url
 
+        updates.update(PaperRepository._validity_updates(existing, incoming))
+
         merged_categories = normalize_source_categories(
             list(existing.source_categories or [])
             + list(incoming.source_categories or [])
@@ -86,6 +88,36 @@ class PaperRepository(BaseRepository[Paper]):
             updates["source_categories"] = clean_categories
         if clean_topics != list(existing.topics or []):
             updates["topics"] = clean_topics
+
+        return updates
+
+    @staticmethod
+    def _validity_updates(existing: Paper, incoming: IndPaper) -> dict[str, object]:
+        """Merge source-validity metadata without discarding known values.
+
+        Citation counts only grow, so keep the larger. A paper that any provider
+        reports as peer-reviewed / open access stays that way (preprints get
+        published; a closed copy elsewhere does not revoke an open one).
+        """
+        updates: dict[str, object] = {}
+
+        if incoming.citation_count is not None and (
+            existing.citation_count is None
+            or incoming.citation_count > existing.citation_count
+        ):
+            updates["citation_count"] = incoming.citation_count
+
+        if incoming.venue and (not existing.venue or existing.venue == "arXiv"):
+            if incoming.venue != existing.venue:
+                updates["venue"] = incoming.venue
+
+        for field in ("is_open_access", "is_peer_reviewed"):
+            new_value = getattr(incoming, field)
+            old_value = getattr(existing, field)
+            if new_value is None or new_value == old_value:
+                continue
+            if old_value is None or new_value is True:
+                updates[field] = new_value
 
         return updates
 
@@ -129,6 +161,10 @@ class PaperRepository(BaseRepository[Paper]):
                 pdf_url=paper_in.pdf_url,
                 topics=topics,
                 source_categories=source_categories,
+                citation_count=paper_in.citation_count,
+                venue=paper_in.venue,
+                is_open_access=paper_in.is_open_access,
+                is_peer_reviewed=paper_in.is_peer_reviewed,
             )
             .on_conflict_do_nothing(constraint="uq_papers_source_external_id")
             .returning(Paper.id)

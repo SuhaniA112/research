@@ -66,10 +66,34 @@ class OpenAlexClient(ResearchSourceClient):
                     external_id=item.get("id"),
                     topics=topics,
                     source_categories=[],
+                    **self._validity_metadata(item),
                 )
             )
 
         return results
+
+    @staticmethod
+    def _validity_metadata(item: dict) -> dict:
+        """Citation count, venue, open-access and peer-review flags for one work."""
+        primary_source = (item.get("primary_location") or {}).get("source") or {}
+        source_type = (primary_source.get("type") or "").lower()
+        work_type = (item.get("type") or "").lower()
+
+        is_peer_reviewed: bool | None = None
+        if work_type == "preprint" or source_type == "repository":
+            is_peer_reviewed = False
+        elif source_type in {"journal", "conference"}:
+            is_peer_reviewed = True
+
+        citation_count = item.get("cited_by_count")
+        is_oa = (item.get("open_access") or {}).get("is_oa")
+
+        return {
+            "citation_count": citation_count if isinstance(citation_count, int) else None,
+            "venue": primary_source.get("display_name") or None,
+            "is_open_access": is_oa if isinstance(is_oa, bool) else None,
+            "is_peer_reviewed": is_peer_reviewed,
+        }
 
     def _reconstruct_abstract(
         self,

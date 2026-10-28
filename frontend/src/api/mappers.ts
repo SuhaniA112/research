@@ -13,6 +13,10 @@ export interface BackendPaper {
   url?: string | null;
   pdf_url?: string | null;
   topics?: string[];
+  citation_count?: number | null;
+  venue?: string | null;
+  is_open_access?: boolean | null;
+  is_peer_reviewed?: boolean | null;
   summary_general?: string | null;
   summary_graduate?: string | null;
   summary_expert?: string | null;
@@ -62,7 +66,7 @@ export function mapBackendPaperToSource(
     // Soft metrics until scoring APIs exist
     relevance: null,
     similarity: null,
-    citations: null,
+    citations: paper.citation_count ?? null,
     citesSaved: null,
     citedBySaved: null,
     relevantTo: paper.topics ?? [],
@@ -80,6 +84,9 @@ export function mapBackendPaperToSource(
     publicationUrl: paper.url ?? paper.pdf_url ?? "#",
     externalId: paper.external_id,
     pdfUrl: paper.pdf_url ?? null,
+    venue: paper.venue ?? null,
+    openAccess: paper.is_open_access ?? null,
+    peerReviewed: paper.is_peer_reviewed ?? null,
     savedOn,
     ...extras,
   });
@@ -96,5 +103,9 @@ export function sourceToIndPaper(source: Source) {
     source: source.source,
     external_id: source.externalId ?? source.id,
     topics: source.topics,
+    citation_count: source.citations,
+    venue: source.venue ?? null,
+    is_open_access: source.openAccess ?? null,
+    is_peer_reviewed: source.peerReviewed ?? null,
   };
 }

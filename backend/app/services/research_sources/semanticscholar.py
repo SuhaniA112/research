@@ -15,7 +15,8 @@ class SemanticScholarClient(ResearchSourceClient):
             "limit": max_results,
             "fields": (
                 "title,abstract,authors,year,url,"
-                "openAccessPdf,fieldsOfStudy"
+                "openAccessPdf,fieldsOfStudy,"
+                "citationCount,venue,isOpenAccess,publicationTypes"
             ),
         }
 
@@ -57,7 +58,37 @@ class SemanticScholarClient(ResearchSourceClient):
                     external_id=item.get("paperId"),
                     topics=topics,
                     source_categories=[],
+                    **self._validity_metadata(item),
                 )
             )
 
         return results
+
+    # Venues that host preprints; papers there are not peer-reviewed yet.
+    PREPRINT_VENUES = {"arxiv", "arxiv.org", "biorxiv", "medrxiv", "ssrn", "corr"}
+
+    @classmethod
+    def _validity_metadata(cls, item: dict) -> dict:
+        """Citation count, venue, open-access and peer-review flags for one paper."""
+        venue = (item.get("venue") or "").strip() or None
+        publication_types = {
+            t for t in (item.get("publicationTypes") or []) if isinstance(t, str)
+        }
+
+        is_peer_reviewed: bool | None = None
+        if venue and venue.lower() in cls.PREPRINT_VENUES:
+            is_peer_reviewed = False
+        elif publication_types & {"JournalArticle", "Conference"}:
+            is_peer_reviewed = True
+
+        is_oa = item.get("isOpenAccess")
+        if not isinstance(is_oa, bool):
+            is_oa = True if (item.get("openAccessPdf") or {}).get("url") else None
+
+        citation_count = item.get("citationCount")
+        return {
+            "citation_count": citation_count if isinstance(citation_count, int) else None,
+            "venue": venue,
+            "is_open_access": is_oa,
+            "is_peer_reviewed": is_peer_reviewed,
+        }
