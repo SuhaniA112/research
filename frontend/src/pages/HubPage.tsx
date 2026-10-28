@@ -159,6 +159,14 @@ export function HubPage() {
             </Link>
           ) : null}
         </p>
+      ) : digest?.method === "embedding" && !hasInterests ? (
+        <p className="mt-2 text-xs text-gray-500">
+          Based on papers you&apos;ve saved.{" "}
+          <Link to="/profile" className="font-medium text-brand-700 hover:underline">
+            Add research areas
+          </Link>{" "}
+          to personalize further.
+        </p>
       ) : digest?.method === "live" ? (
         <p className="mt-2 text-xs text-gray-500">Fresh results from a live search of your interests.</p>
       ) : null}

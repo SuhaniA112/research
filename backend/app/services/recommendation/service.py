@@ -119,7 +119,7 @@ class RecommendationService:
         if not refresh and cached and cached[0] == key and cached[1] > time.time():
             ranked = cached[2]
         else:
-            ranked = await self._rank(interests, saved_ids) if interests else None
+            ranked = await self._rank(interests, saved_ids) if interests or saved_ids else None
             if not ranked or not ranked["entries"]:
                 # Never return an empty hub: fall back to recently added papers.
                 ranked = await self._rank_recent(set(saved_ids))
@@ -158,13 +158,18 @@ class RecommendationService:
             return await self._rank_lexical(interests, exclude, now)
 
         try:
-            term_vecs = np.asarray(await self._embed_queries(interests))
+            term_vecs = np.asarray(await self._embed_queries(interests)) if interests else None
         except Exception:  # noqa: BLE001 - embedding outage falls back to topics
             return await self._rank_lexical(interests, exclude, now)
 
         saved_vecs = list((await self._paper_vectors(saved_ids)).values()) if saved_ids else []
-        queries = list(term_vecs)
         saved_centroid = ranking.centroid(saved_vecs) if saved_vecs else None
+        if term_vecs is None:
+            # Cold start (no interests yet): rank by closeness to what the user saved.
+            if saved_centroid is None:
+                return {"entries": [], "method": "none", "generated_at": now}
+            term_vecs = saved_centroid[None, :]
+        queries = list(term_vecs)
         if saved_centroid is not None:
             queries.append(saved_centroid)
 
@@ -197,7 +202,9 @@ class RecommendationService:
                 "paper_id": ids[i],
                 "relevance": ranking.to_percent(scores["interest"][i]),
                 "similarity": ranking.to_percent(scores["saved"][i]),
-                "matched_interest": interests[int(scores["best_interest"][i])],
+                "matched_interest": (
+                    interests[int(scores["best_interest"][i])] if interests else None
+                ),
             }
             for i in order
         ]
