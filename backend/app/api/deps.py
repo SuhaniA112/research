@@ -25,6 +25,7 @@ from app.services.generation.openrouter_client import OpenRouterClient
 from app.services.ingestion_service import IngestionService
 from app.services.indexing.paper_indexer import PaperIndexer
 from app.services.profile_service import ProfileService
+from app.services.recommendation.service import RecommendationService
 from app.services.project_service import ProjectService
 from app.services.research_service import ResearchService
 from app.services.summarization.paper_summarizer import PaperSummarizer
@@ -264,4 +265,22 @@ IngestionServiceDep = Annotated[IngestionService, Depends(get_ingestion_service)
 AskServiceDep = Annotated[AskService, Depends(get_ask_service)]
 DiscoverySearchServiceDep = Annotated[
     DiscoverySearchService, Depends(get_discovery_search_service)
+]
+
+
+def get_recommendation_service(
+    profile_repo: ProfileRepoDep,
+    project_repo: ProjectRepoDep,
+    project_paper_repo: ProjectPaperRepoDep,
+    chunk_repo: ChunkRepoDep,
+    paper_repo: PaperRepoDep,
+    voyage_client: VoyageClientDep,
+) -> RecommendationService:
+    return RecommendationService(
+        profile_repo, project_repo, project_paper_repo, chunk_repo, paper_repo, voyage_client
+    )
+
+
+RecommendationServiceDep = Annotated[
+    RecommendationService, Depends(get_recommendation_service)
 ]

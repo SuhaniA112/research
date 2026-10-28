@@ -808,10 +808,12 @@ class DiscoverySearchService:
             if intent:
                 return intent, normalize_query(intent)
 
-        if self.profile_repo is not None:
-            profile = await self.profile_repo.ensure_singleton()
-            intent = build_intent_query_from_topics(
-                profile.research_areas, profile.keywords
+        if self.profile_repo is not None and user_id is not None:
+            profile = await self.profile_repo.get_for_user(user_id)
+            intent = (
+                build_intent_query_from_topics(profile.research_areas, profile.keywords)
+                if profile is not None
+                else ""
             )
             if intent:
                 return intent, normalize_query(intent)

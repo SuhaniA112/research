@@ -1,24 +1,30 @@
 import uuid
 
-from sqlalchemy import ARRAY, Boolean, String
+from sqlalchemy import ARRAY, Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
 
-# Shared app profile until real auth lands. One row, always the same id.
+# Legacy shared row from before per-user profiles; no longer served.
 SINGLETON_PROFILE_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 
 
 class Profile(Base, TimestampMixin):
-    """Singleton preferences/identity row (no auth yet)."""
+    """Per-user profile: display identity and research preferences."""
 
     __tablename__ = "profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        default=SINGLETON_PROFILE_ID,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        unique=True,
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="Researcher")
     full_name: Mapped[str] = mapped_column(

@@ -6,7 +6,7 @@ from app.api.deps import AskServiceDep, CurrentUserDep, IngestionServiceDep, Pro
 from app.schemas.ask import AskRequest, AskResponse
 from app.schemas.paper import PaperResponse, SavePaperRequest, SavePaperResponse
 from app.schemas.project import ProjectCreate, ProjectResponse
-from app.schemas.stats import SourceValidityResponse
+from app.schemas.stats import ProjectStatsResponse, SourceValidityResponse
 
 router = APIRouter()
 
@@ -56,6 +56,16 @@ async def list_project_papers(
     current_user: CurrentUserDep,
 ) -> list[PaperResponse]:
     return await service.list_papers_for_project(project_id, current_user.id)
+
+
+@router.get("/{project_id}/stats", response_model=ProjectStatsResponse)
+async def get_project_stats(
+    project_id: UUID,
+    service: IngestionServiceDep,
+    current_user: CurrentUserDep,
+) -> ProjectStatsResponse:
+    """All overview-card statistics in one response."""
+    return await service.get_project_stats(project_id, current_user.id)
 
 
 @router.get(

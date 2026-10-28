@@ -28,6 +28,31 @@ class PaperRepository(BaseRepository[Paper]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_many(self, paper_ids: list[UUID]) -> dict[UUID, Paper]:
+        if not paper_ids:
+            return {}
+        result = await self.session.execute(select(Paper).where(Paper.id.in_(paper_ids)))
+        return {paper.id: paper for paper in result.scalars().all()}
+
+    async def find_by_topic_overlap(
+        self, topics: list[str], *, exclude: set[UUID], limit: int
+    ) -> list[tuple[Paper, int]]:
+        """Papers sharing topics with ``topics`` (case-insensitive), most overlap first."""
+        wanted = {t.casefold() for t in topics if t}
+        if not wanted:
+            return []
+        stmt = select(Paper).where(Paper.topics.overlap(list(topics))).limit(limit * 4)
+        result = await self.session.execute(stmt)
+        scored = []
+        for paper in result.scalars().all():
+            if paper.id in exclude:
+                continue
+            overlap = sum(1 for t in paper.topics or [] if t.casefold() in wanted)
+            if overlap:
+                scored.append((paper, overlap))
+        scored.sort(key=lambda item: (-item[1], item[0].title.lower()))
+        return scored[:limit]
+
     async def get_by_id_with_chunks(self, paper_id: UUID) -> Paper | None:
         stmt = (
             select(Paper)

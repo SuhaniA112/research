@@ -211,7 +211,7 @@ async def test_resolve_empty_query_no_context_returns_422(mock_voyage) -> None:
     profile.research_areas = []
     profile.keywords = []
     profile_repo = AsyncMock()
-    profile_repo.ensure_singleton.return_value = profile
+    profile_repo.get_for_user.return_value = profile
 
     service = DiscoverySearchService(
         paper_repo=AsyncMock(),
