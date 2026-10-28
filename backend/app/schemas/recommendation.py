@@ -38,7 +38,8 @@ class PaperScore(BaseModel):
     relevance: int | None = None  # 0-100 match to the project
     similarity: int | None = None  # 0-100 match to the project's saved papers
     search_match: int | None = None  # 0-100 match to the query, when given
-    score: float | None = None  # blended 0-1 ranking score
+    score: float | None = None  # weighted 0-1 ranking score (features.py)
+    features: dict[str, float | None] | None = None  # inputs to `score`, for transparency
 
 
 class ScoresResponse(BaseModel):

@@ -92,5 +92,18 @@ def test_report_renders_all_sections_with_valid_svg() -> None:
         ET.fromstring(svg)  # well-formed
 
 
+def test_report_renders_tuning_section() -> None:
+    m = {"ndcg@10": 0.5, "mrr": 0.4, "recall@10": 0.9}
+    tuning = {
+        "k": 10, "step": 0.1, "n_queries": 5, "n_candidates": 20,
+        "metrics": {"baseline (vector similarity only)": m, "tuned (leave-one-out)": m},
+        "weights": {"current": {"search": 0.5, "topic": 0.5}, "tuned": {"search": 1.0, "topic": 0.0}},
+    }
+    page = render(None, None, tuning)
+    assert "Relevance model tuning" in page and "leave-one-out" in page
+    for svg in re.findall(r"<svg.*?</svg>", page, flags=re.S):
+        ET.fromstring(svg)
+
+
 def test_report_renders_empty_state() -> None:
     assert "No results yet" in render(None, None)

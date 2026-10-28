@@ -367,12 +367,38 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}.badge{font-size:10px;
 """
 
 
-def render(run: dict | None, diagnostics: dict | None) -> str:
+def tuning_section(t: dict) -> str:
+    k = t["k"]
+    rows = "".join(
+        f"<tr><td>{esc(name)}</td><td class=num>{fmt(m[f'ndcg@{k}'])}</td>"
+        f"<td class=num>{fmt(m['mrr'])}</td><td class=num>{fmt(m[f'recall@{k}'])}</td></tr>"
+        for name, m in t["metrics"].items()
+    )
+    table = (
+        f'<div class="table-wrap"><table><thead><tr><th>Ranking</th><th>nDCG@{k}</th>'
+        f"<th>MRR</th><th>Recall@{k}</th></tr></thead><tbody>{rows}</tbody></table></div>"
+    )
+    names = list(t["weights"]["tuned"])
+    bars = grouped_bars(
+        names,
+        {label: [t["weights"][label].get(n, 0.0) for n in names] for label in ("current", "tuned")},
+    )
+    return (
+        "<section><h2>Relevance model tuning</h2>"
+        f"<p class=muted>{t['n_queries']} golden queries x {t['n_candidates']} candidates · "
+        f"grid step {t['step']} · leave-one-out row is the honest estimate</p>"
+        f"{table}<figure><figcaption>Feature weights</figcaption>{bars}</figure></section>"
+    )
+
+
+def render(run: dict | None, diagnostics: dict | None, tuning: dict | None = None) -> str:
     body = []
     if run:
         body.append(retrieval_section(run))
     if diagnostics:
         body.append(diagnostics_section(diagnostics))
+    if tuning:
+        body.append(tuning_section(tuning))
     if not body:
         body.append('<p class="empty">No results yet. Run <code>npm run eval</code> and/or '
                     "<code>npm run eval:diagnostics</code> first.</p>")
@@ -403,9 +429,11 @@ def main() -> None:
     diag_path = args.diagnostics or latest("diagnostics-*.json")
     run = json.loads(run_path.read_text(encoding="utf-8")) if run_path else None
     diagnostics = json.loads(diag_path.read_text(encoding="utf-8")) if diag_path else None
+    tune_path = latest("tuning-*.json")
+    tuning = json.loads(tune_path.read_text(encoding="utf-8")) if tune_path else None
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(render(run, diagnostics), encoding="utf-8")
+    args.out.write_text(render(run, diagnostics, tuning), encoding="utf-8")
     print(f"Wrote {args.out}" + (f"\n  run: {run_path}" if run_path else "") + (f"\n  diagnostics: {diag_path}" if diag_path else ""))
 
 

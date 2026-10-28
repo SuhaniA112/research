@@ -18,6 +18,7 @@ import numpy as np
 from app.models.user import User
 from app.schemas.paper import PaperResponse
 from app.schemas.recommendation import DigestResponse, PaperScore, RecommendedPaper
+from app.services.recommendation import features as feat
 from app.services.recommendation import ranking
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,7 @@ class RecommendationService:
         project_embedding_repo=None,
     ) -> None:
         self.project_embedding_repo = project_embedding_repo
+        self.weights = feat.load_weights()
         self.profile_repo = profile_repo
         self.project_repo = project_repo
         self.project_paper_repo = project_paper_repo
@@ -135,6 +137,25 @@ class RecommendationService:
                 logger.warning("project embedding failed (%s)", exc)
         # Stale beats missing: the text changed but re-embedding failed.
         return np.asarray(row.embedding, dtype=np.float64) if row is not None else None
+
+    def _paper_features(
+        self,
+        paper,
+        *,
+        semantic: float | None,
+        saved: float | None,
+        search: float | None = None,
+        context: set[str] | frozenset = frozenset(),
+    ) -> dict[str, float | None]:
+        """Feature vector for the weighted model (see features.py)."""
+        return {
+            "search": feat.similarity_feature(search),
+            "semantic": feat.similarity_feature(semantic),
+            "saved": feat.similarity_feature(saved),
+            "recency": feat.recency_feature(getattr(paper, "year", None), datetime.now().year),
+            "citations": feat.citation_feature(getattr(paper, "citation_count", None)),
+            "topic": feat.topic_feature(getattr(paper, "topics", None) or [], set(context)),
+        }
 
     async def _paper_vectors(self, paper_ids: list[UUID]) -> dict[UUID, np.ndarray]:
         chunks = await self.chunk_repo.get_for_papers(paper_ids)
@@ -248,7 +269,25 @@ class RecommendationService:
         scores = ranking.score_candidates(
             cand, term_vecs, np.stack(saved_vecs) if saved_vecs else None
         )
-        order = ranking.mmr(cand, scores["score"], k=min(len(ids), MAX_RANKED))
+        # Weighted model: similarity plus recency, citations and topic overlap.
+        meta = await self.paper_repo.get_many(ids)
+        context = feat.tokens(interests)
+        composite = np.array(
+            [
+                feat.composite(
+                    self._paper_features(
+                        meta.get(pid),
+                        semantic=float(scores["interest"][i]),
+                        saved=None if np.isnan(scores["saved"][i]) else float(scores["saved"][i]),
+                        context=context,
+                    ),
+                    self.weights,
+                )
+                or 0.0
+                for i, pid in enumerate(ids)
+            ]
+        )
+        order = ranking.mmr(cand, composite, k=min(len(ids), MAX_RANKED))
         entries = [
             {
                 "paper_id": ids[i],
@@ -365,6 +404,10 @@ class RecommendationService:
         saved = await self.project_paper_repo.list_papers_for_project(project.id)
         saved_vecs = await self._paper_vectors([p.id for p in saved])
         saved_ids = list(saved_vecs.keys())
+        meta = await self.paper_repo.get_many(list(targets))
+        context = feat.tokens(
+            [*(project.topics or []), *(project.keywords or []), query or ""]
+        )
         saved_matrix = (
             ranking.unit(np.stack([saved_vecs[s] for s in saved_ids])) if saved_ids else None
         )
@@ -378,11 +421,15 @@ class RecommendationService:
                 # A saved paper is trivially identical to itself; compare to the others.
                 others = [s for sid, s in zip(saved_ids, saved_matrix @ v) if sid != pid]
                 similarity = float(max(others)) if others else None
+            features = self._paper_features(
+                meta.get(pid), semantic=relevance, saved=similarity, search=search, context=context
+            )
             out[str(pid)] = PaperScore(
                 relevance=ranking.to_percent(relevance),
                 similarity=ranking.to_percent(similarity),
                 search_match=ranking.to_percent(search),
-                score=ranking.blend_project_score(search, relevance, similarity),
+                score=feat.composite(features, self.weights),
+                features=features,
             )
         return out
 

@@ -49,6 +49,9 @@ FastAPI + async SQLAlchemy + Postgres (pgvector). Schema is applied with **Alemb
   pgvector ANN, MMR diversity, cached per user; paged, falls back to topic overlap
 - `GET /api/v1/papers/{id}/related`, `POST /api/v1/projects/{id}/similarity`
 - `GET /api/v1/projects/{id}/stats` — breakdown, recency, validity, topics in one call
+- Ranking uses a weighted feature model (`recommendation/features.py`): similarity to the
+  search, project and saved papers plus recency, citations and topic overlap; weights are
+  tuned on the golden set with `npm run eval:tune` (leave-one-out validated)
 - Profiles are per user (`/users/me` scoped by the current user)
 
 **Auth**

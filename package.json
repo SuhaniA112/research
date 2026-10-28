@@ -17,7 +17,8 @@
     "eval:diagnostics": "node scripts/py.mjs --backend -m eval.diagnose_embeddings",
     "eval:report": "node scripts/py.mjs --backend -m eval.report",
     "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api",
-    "bench": "node scripts/bench.mjs"
+    "bench": "node scripts/bench.mjs",
+    "eval:tune": "node scripts/py.mjs --backend -m eval.tune_weights"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
