@@ -1,5 +1,6 @@
 import httpx
 
+from app.core.config import settings
 from app.schemas.research_papers import IndPaper
 from app.services.query_normalization import normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
@@ -9,10 +10,13 @@ from app.services.taxonomy.paper_topics import build_paper_topics
 class SemanticScholarClient(ResearchSourceClient):
     BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 
-    async def search(self, query: str, max_results: int = 10) -> list[IndPaper]:
+    async def search(
+        self, query: str, max_results: int = 10, offset: int = 0
+    ) -> list[IndPaper]:
         params = {
             "query": query,
             "limit": max_results,
+            "offset": offset,
             "fields": (
                 "title,abstract,authors,year,url,"
                 "openAccessPdf,fieldsOfStudy,"
@@ -20,8 +24,12 @@ class SemanticScholarClient(ResearchSourceClient):
             ),
         }
 
+        # Without a key requests share a public pool and often get 429.
+        key = settings.semantic_scholar_api_key.strip()
+        headers = {"x-api-key": key} if key else {}
+
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.get(self.BASE_URL, params=params)
+            response = await client.get(self.BASE_URL, params=params, headers=headers)
             response.raise_for_status()
 
         data = response.json()

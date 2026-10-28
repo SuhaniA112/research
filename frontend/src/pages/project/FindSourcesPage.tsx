@@ -89,6 +89,7 @@ function sortSources(sources: Source[], sortBy: SourceSortOption): Source[] {
 
 const SEARCH_LIMIT = 20;
 const SEARCH_LIMIT_MAX = 50; // backend max per search
+const MAX_PAGES = 10; // "search for more" pages per query
 
 export function FindSourcesPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -100,6 +101,10 @@ export function FindSourcesPage() {
   const [visibleCount, setVisibleCount] = useState(3);
   // Results fetched per search; "Search for more" raises it to the API max.
   const [fetchLimit, setFetchLimit] = useState(SEARCH_LIMIT);
+  // Paging for typed searches: each "search for more" fetches the next provider page.
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exhausted, setExhausted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
@@ -172,7 +177,49 @@ export function FindSourcesPage() {
   // A new query starts back at the default page size.
   useEffect(() => {
     setFetchLimit(SEARCH_LIMIT);
+    setPage(0);
+    setExhausted(false);
   }, [search]);
+
+  function searchForMore() {
+    if (!projectId) return;
+    // Empty box: suggestions just widen to the API max.
+    if (!search.trim()) {
+      setVisibleCount((c) => c + 2);
+      setFetchLimit(SEARCH_LIMIT_MAX);
+      return;
+    }
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    void searchSources(search, {
+      projectId,
+      limit: SEARCH_LIMIT,
+      page: nextPage,
+      fallbackToLegacy: false,
+    })
+      .then((more) => {
+        const seen = new Set(results.flatMap((s) => [s.id, s.externalId ?? s.id]));
+        const fresh = more.filter((s) => !seen.has(s.id) && !seen.has(s.externalId ?? s.id));
+        setPage(nextPage);
+        if (fresh.length === 0) {
+          setExhausted(true);
+          return;
+        }
+        const merged = [...results, ...fresh];
+        setResults(applyCachedProjectScores(projectId, merged));
+        setVisibleCount((c) => c + Math.min(fresh.length, 5));
+        void rememberProjectSearchResults(projectId, fresh);
+        void scoreForProject(projectId, merged, search)
+          .then(setResults)
+          .catch(() => undefined);
+      })
+      .catch(() => setExhausted(true))
+      .finally(() => setLoadingMore(false));
+  }
+
+  const canSearchMore = search.trim()
+    ? !exhausted && page < MAX_PAGES
+    : fetchLimit < SEARCH_LIMIT_MAX && results.length >= fetchLimit;
 
   const yearAtFullRange = yearFrom === YEAR_MIN && yearTo === YEAR_MAX;
 
@@ -328,13 +375,12 @@ export function FindSourcesPage() {
             Showing all {filtered.length} matching paper{filtered.length === 1 ? "" : "s"}
             {filtered.length < results.length ? " for these filters" : ""}.
           </p>
-          {fetchLimit < SEARCH_LIMIT_MAX && results.length >= fetchLimit ? (
+          {loadingMore ? (
+            <p className="mt-2 text-sm text-gray-400">Searching for more papers…</p>
+          ) : canSearchMore ? (
             <button
               type="button"
-              onClick={() => {
-                setVisibleCount((c) => c + 2);
-                setFetchLimit(SEARCH_LIMIT_MAX);
-              }}
+              onClick={searchForMore}
               className="mt-2 text-sm font-semibold tracking-wide text-brand-700 hover:underline"
             >
               SEARCH FOR MORE

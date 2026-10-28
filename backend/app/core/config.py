@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Hardcoded default, not user-selectable — see CONTEXT.md Output decision.
     openrouter_model: str = Field(default="openai/gpt-4o-mini")
 
+    # Optional provider settings: S2 key avoids 429s; mailto joins OpenAlex's polite pool.
+    semantic_scholar_api_key: str = Field(default="")
+    openalex_mailto: str = Field(default="")
+
     # Max cosine distance (0 = identical, 2 = opposite) for a Chunk to be included in
     # Retrieval results; not a 0-1 similarity score.
     retrieval_max_distance: float = Field(default=0.4)

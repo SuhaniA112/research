@@ -12,10 +12,12 @@ from app.services.taxonomy.paper_topics import (
 class ArxivClient(ResearchSourceClient):
     BASE_URL = "https://export.arxiv.org/api/query"
 
-    async def search(self, query: str, max_results: int = 10) -> list[IndPaper]:
+    async def search(
+        self, query: str, max_results: int = 10, offset: int = 0
+    ) -> list[IndPaper]:
         params = {
             "search_query": f"all:{query}",
-            "start": 0,
+            "start": offset,
             "max_results": max_results,
         }
 

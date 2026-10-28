@@ -29,6 +29,8 @@ class DiscoverySearchRequest(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=_MAX_LIMIT)
     force_refresh: bool = False
     progressive: bool = False
+    # >0 = next page from providers ("search for more"); returns only that page's papers.
+    page: int = Field(default=0, ge=0, le=20)
 
     @model_validator(mode="after")
     def validate_query_or_project(self) -> "DiscoverySearchRequest":

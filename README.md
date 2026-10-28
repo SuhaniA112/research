@@ -28,6 +28,8 @@ Edit `backend/.env`:
 - `VOYAGE_API_KEY` — faster discovery + embeddings on save
 - `OPENROUTER_API_KEY` — ask / generation
   (optional: without it, or when free-tier limits hit, summaries fall back to the abstract and OpenRouter is paused for the `Retry-After` window)
+- `SEMANTIC_SCHOLAR_API_KEY` — optional; without it Semantic Scholar often rate-limits (429)
+- `OPENALEX_MAILTO` — optional contact email for OpenAlex's more reliable "polite pool"
 
 ### Frontend-only (mocks)
 
