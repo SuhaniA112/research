@@ -74,10 +74,11 @@ export async function getSource(sourceId: string): Promise<Source | undefined> {
     const { data } = await apiClient.get<BackendPaper>(`/api/v1/papers/${id}`, {
       timeout: SUMMARIZE_TIMEOUT_MS,
     });
-    return mapBackendPaperToSource(data, {
+    const fresh = mapBackendPaperToSource(data, {
       savedOn: cached?.savedOn,
       starred: cached?.starred,
     });
+    return cached ? keepScores(cached, fresh) : fresh;
   } catch {
     return cached;
   }
@@ -87,6 +88,16 @@ export async function getSource(sourceId: string): Promise<Source | undefined> {
  * Ensure leveled summaries + key findings exist for any source (saved or not).
  * UUID papers: GET /papers/:id (lazy backfill). Others: POST /papers/summarize.
  */
+/** Scores are per-view (search/digest), not stored on the paper; keep them across refetches. */
+function keepScores(from: Source, to: Source): Source {
+  return {
+    ...to,
+    relevance: to.relevance ?? from.relevance,
+    similarity: to.similarity ?? from.similarity,
+    relevantTo: from.relevantTo.length ? from.relevantTo : to.relevantTo,
+  };
+}
+
 export async function ensureSourceSummaries(source: Source): Promise<Source> {
   if (env.useMocks) {
     return source;
@@ -104,11 +115,11 @@ export async function ensureSourceSummaries(source: Source): Promise<Source> {
       if (isPaperUuid(source.id)) {
         const fetched = await getSource(source.id);
         if (fetched && hasLeveledSummaries(fetched)) {
-          return {
+          return keepScores(source, {
             ...fetched,
             savedOn: source.savedOn ?? fetched.savedOn,
             starred: source.starred ?? fetched.starred,
-          };
+          });
         }
       }
 
@@ -117,10 +128,13 @@ export async function ensureSourceSummaries(source: Source): Promise<Source> {
         { paper: sourceToIndPaper(source) },
         { timeout: SUMMARIZE_TIMEOUT_MS },
       );
-      return mapBackendPaperToSource(data, {
-        savedOn: source.savedOn,
-        starred: source.starred,
-      });
+      return keepScores(
+        source,
+        mapBackendPaperToSource(data, {
+          savedOn: source.savedOn,
+          starred: source.starred,
+        }),
+      );
     } catch {
       return source;
     } finally {

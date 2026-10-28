@@ -27,6 +27,15 @@ export interface BackendPaper {
 const paperCache = new Map<string, Source>();
 
 export function cacheSource(source: Source): Source {
+  // A refetch without scores shouldn't erase scores the cache already has.
+  const prev = paperCache.get(source.id);
+  if (prev && (source.relevance == null || source.similarity == null)) {
+    source = {
+      ...source,
+      relevance: source.relevance ?? prev.relevance,
+      similarity: source.similarity ?? prev.similarity,
+    };
+  }
   paperCache.set(source.id, source);
   if (source.externalId) {
     paperCache.set(source.externalId, source);

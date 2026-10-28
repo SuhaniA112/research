@@ -59,9 +59,10 @@ export function HubPage() {
   const enriched = useRef(false);
 
   const refresh = useCallback(async (force = false) => {
-    const page = env.useMocks
-      ? await loadMockDigest()
-      : await fetchDigestPage({ limit: FIRST_PAGE, refresh: force });
+    const load = () =>
+      env.useMocks ? loadMockDigest() : fetchDigestPage({ limit: FIRST_PAGE, refresh: force });
+    // One retry covers a brand-new user's first request racing account setup.
+    const page = await load().catch(() => load());
     setDigest(page);
     if (!env.useMocks && page.items.length > 0) writeDigestSnapshot(page);
     return page;
@@ -84,8 +85,8 @@ export function HubPage() {
         await searchSources(interest, { fallbackToLegacy: false }).catch(() => []);
         if (!cancelled) await refresh(true);
       })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load digest");
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load recommendations. Refresh the page to try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

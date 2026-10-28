@@ -80,6 +80,9 @@ function sortSources(sources: Source[], sortBy: SourceSortOption): Source[] {
   }
 }
 
+const SEARCH_LIMIT = 20;
+const SEARCH_LIMIT_MAX = 50; // backend max per search
+
 export function FindSourcesPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams] = useSearchParams();
@@ -88,6 +91,8 @@ export function FindSourcesPage() {
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [results, setResults] = useState<Source[]>([]);
   const [visibleCount, setVisibleCount] = useState(3);
+  // Results fetched per search; "Search for more" raises it to the API max.
+  const [fetchLimit, setFetchLimit] = useState(SEARCH_LIMIT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
@@ -117,7 +122,7 @@ export function FindSourcesPage() {
     const handle = window.setTimeout(() => {
       setLoading(true);
       setError(null);
-      void searchSources(search, { projectId })
+      void searchSources(search, { projectId, limit: fetchLimit })
         .then((sources) => {
           if (cancelled) return;
           setResults(sources);
@@ -127,7 +132,8 @@ export function FindSourcesPage() {
               if (!cancelled) setResults(scored);
             })
             .catch(() => undefined);
-          setVisibleCount(3);
+          // Keep the position when this is a "search for more" refetch.
+          setVisibleCount((c) => (fetchLimit > SEARCH_LIMIT ? Math.max(c, 3) : 3));
           if (search.trim()) {
             void rememberProjectSearchResults(projectId, sources);
           }
@@ -150,7 +156,12 @@ export function FindSourcesPage() {
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [projectId, search, invalidateSearchHistory]);
+  }, [projectId, search, fetchLimit, invalidateSearchHistory]);
+
+  // A new query starts back at the default page size.
+  useEffect(() => {
+    setFetchLimit(SEARCH_LIMIT);
+  }, [search]);
 
   const yearAtFullRange = yearFrom === YEAR_MIN && yearTo === YEAR_MAX;
 
@@ -290,6 +301,28 @@ export function FindSourcesPage() {
           >
             LOAD MORE
           </button>
+        </div>
+      )}
+      {!loading && filtered.length > 0 && visibleCount >= filtered.length && (
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>
+            Showing all {filtered.length} matching paper{filtered.length === 1 ? "" : "s"}
+            {filtered.length < results.length ? " for these filters" : ""}.
+          </p>
+          {fetchLimit < SEARCH_LIMIT_MAX && results.length >= fetchLimit ? (
+            <button
+              type="button"
+              onClick={() => {
+                setVisibleCount((c) => c + 2);
+                setFetchLimit(SEARCH_LIMIT_MAX);
+              }}
+              className="mt-2 text-sm font-semibold tracking-wide text-brand-700 hover:underline"
+            >
+              SEARCH FOR MORE
+            </button>
+          ) : (
+            <p className="mt-1">No more results for this search. Try different keywords.</p>
+          )}
         </div>
       )}
     </div>

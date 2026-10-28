@@ -114,7 +114,8 @@ export async function withSimilarityToSaved(
     `/api/v1/projects/${projectId}/similarity`,
     { paper_ids: ids },
   );
-  return sources.map((s) =>
-    s.id in data.scores ? { ...s, similarity: data.scores[s.id] ?? null } : s,
-  );
+  return sources.map((s) => {
+    const score = data.scores[s.id];
+    return score == null ? s : { ...s, similarity: score };
+  });
 }

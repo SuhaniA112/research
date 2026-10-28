@@ -1,6 +1,7 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.profile import SINGLETON_PROFILE_ID, Profile
@@ -48,12 +49,18 @@ class ProfileRepository(BaseRepository[Profile]):
         return result.scalar_one_or_none()
 
     async def ensure_for_user(self, user: User) -> Profile:
-        """Return the user's profile, creating it from their account on first use."""
+        """Return the user's profile, creating it from their account on first use.
+
+        Concurrent first requests (e.g. /users/me and /digest) both land here, so the
+        insert ignores a duplicate instead of failing.
+        """
         existing = await self.get_for_user(user.id)
         if existing is not None:
             return existing
-        return await self.create(
-            Profile(
+        await self.session.execute(
+            insert(Profile)
+            .values(
+                id=uuid4(),
                 user_id=user.id,
                 name=_first_name(user.full_name),
                 full_name=user.full_name or "Researcher",
@@ -66,4 +73,8 @@ class ProfileRepository(BaseRepository[Profile]):
                 weekly_digest=True,
                 source_notifications=False,
             )
+            .on_conflict_do_nothing(index_elements=["user_id"])
         )
+        profile = await self.get_for_user(user.id)
+        assert profile is not None
+        return profile
