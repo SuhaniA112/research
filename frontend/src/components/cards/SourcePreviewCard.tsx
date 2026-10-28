@@ -59,10 +59,10 @@ export function SourcePreviewCard({
           ) : null}
           <div className="mt-auto flex gap-2 pt-4">
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
-              {source.relevance == null ? "[X]% RELEVANT" : `${source.relevance}% RELEVANT`}
+              {source.relevance == null ? "— RELEVANT" : `${source.relevance}% RELEVANT`}
             </span>
             <span className="rounded bg-metrics-bg px-2 py-0.5 text-xs font-semibold text-metrics">
-              {source.similarity == null ? "[X]% SIMILAR" : `${source.similarity}% SIMILAR`}
+              {source.similarity == null ? "— SIMILAR" : `${source.similarity}% SIMILAR`}
             </span>
           </div>
         </Link>
@@ -100,7 +100,11 @@ export function SourcePreviewCard({
             <p className="mt-2 text-sm text-gray-400">Generating summary…</p>
           ) : null}
 
-          {hasAiSummary ? (
+          {hasAiSummary && source.summarySource === "extractive" ? (
+            <span className="mt-3 flex items-center gap-1 text-xs text-gray-500">
+              Summary from abstract
+            </span>
+          ) : hasAiSummary ? (
             <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
               <Sparkles className="h-3.5 w-3.5" />
               AI Generated Description

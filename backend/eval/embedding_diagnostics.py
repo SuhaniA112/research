@@ -1,20 +1,4 @@
-"""Embedding-space diagnostics for the Retrieval index.
-
-Pure numpy functions (no DB / network), unit-tested in
-tests/unit/test_embedding_diagnostics.py and driven by eval/diagnose_embeddings.py.
-
-What they answer
-----------------
-- **Geometry**: are vectors unit-normalised? How anisotropic is the space (do all
-  vectors crowd into a narrow cone, inflating every cosine similarity)? How many
-  dimensions carry the variance (effective dimensionality)?
-- **Hubness**: do a few chunks show up in almost everyone's nearest neighbours?
-  Hubs get retrieved for unrelated queries and hurt precision.
-- **Separation**: for golden questions, are similarities to relevant papers clearly
-  above similarities to irrelevant ones (ROC AUC), and which distance threshold
-  best splits them (used to tune ``retrieval_max_distance``)?
-- **Projection**: a 2-D PCA layout for plotting papers / chunks.
-"""
+"""Embedding-space diagnostics: norms, anisotropy, PCA, hubness, separation."""
 
 from __future__ import annotations
 

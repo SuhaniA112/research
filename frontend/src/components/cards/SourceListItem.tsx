@@ -38,7 +38,7 @@ export function SourceListItem({
         {relevance !== undefined && (
           <span className="text-gray-500">
             {" "}
-            • {relevance == null ? "[X]" : relevance}% Relevant
+            • {relevance == null ? "—" : `${relevance}%`} Relevant
           </span>
         )}
       </span>

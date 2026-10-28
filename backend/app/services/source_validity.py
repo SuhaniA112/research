@@ -1,9 +1,6 @@
-"""Source Validity stats for a project's saved papers.
+"""Source Validity percentages over a project's saved papers.
 
-Pure functions over Paper-like objects so the math is unit-testable without a
-database. Each metric is the share of saved papers that meet the criterion,
-counted only over papers whose provider reported the underlying field; a metric
-with no reported data is ``None`` (the UI shows a dash, not a fake number).
+Each metric counts only papers whose provider reported the field; no data -> None.
 """
 
 from __future__ import annotations

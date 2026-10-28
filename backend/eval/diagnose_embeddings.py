@@ -1,16 +1,6 @@
-"""Embedding diagnostics for a project's Retrieval index (or the whole database).
+"""Embedding diagnostics for a project's stored chunks (or --all).
 
-Pulls stored Chunk embeddings from Postgres, then reports geometry (norms,
-anisotropy, effective dimensionality), hubness, a 2-D PCA layout of papers and,
-when golden_set.json has items and a Voyage key is configured, how well
-query→paper similarity separates relevant from irrelevant papers (ROC AUC and a
-distance-threshold sweep for tuning ``retrieval_max_distance``).
-
-Usage:
-    npm run eval:diagnostics -- --project-id <uuid>
-    python -m eval.diagnose_embeddings --all --max-chunks 5000
-
-Render charts with ``npm run eval:report`` (eval/report.py).
+Usage: npm run eval:diagnostics -- --project-id <uuid>
 """
 
 from __future__ import annotations

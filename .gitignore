@@ -32,3 +32,6 @@ htmlcov/
 
 # Eval outputs (JSON results + HTML report)
 backend/eval/results/
+
+# Benchmark builds and results
+.bench/

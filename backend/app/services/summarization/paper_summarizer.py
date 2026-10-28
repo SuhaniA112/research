@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
+
+import httpx
 
 from app.services.generation.openrouter_client import OpenRouterClient, OpenRouterError
 
@@ -13,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 _MAX_SOURCE_CHARS = 14_000
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
+# Out of quota / overloaded: skip OpenRouter for a while so requests answer instantly.
+_COOLDOWN_STATUSES = {402, 429, 502, 503}
+_DEFAULT_COOLDOWN_S = 120.0
+_MAX_COOLDOWN_S = 3600.0
+_cooldown_until = 0.0
 
 _SYSTEM_PROMPT = """You summarize academic papers for a research app.
 Return ONLY valid JSON with this exact shape:
@@ -43,10 +51,25 @@ class PaperSummarizer:
     def __init__(self, openrouter_client: OpenRouterClient) -> None:
         self.openrouter_client = openrouter_client
 
+    @staticmethod
+    def available() -> bool:
+        return time.monotonic() >= _cooldown_until
+
+    @staticmethod
+    def _start_cooldown(response: httpx.Response) -> None:
+        global _cooldown_until
+        try:
+            wait = float(response.headers.get("retry-after", _DEFAULT_COOLDOWN_S))
+        except ValueError:
+            wait = _DEFAULT_COOLDOWN_S
+        wait = min(max(wait, 1.0), _MAX_COOLDOWN_S)
+        _cooldown_until = time.monotonic() + wait
+        logger.warning("OpenRouter %s; pausing summaries for %.0fs", response.status_code, wait)
+
     async def summarize(
         self, *, title: str, source_text: str
     ) -> PaperSummaryResult | None:
-        if not self.openrouter_client.api_key:
+        if not self.openrouter_client.api_key or not self.available():
             return None
 
         body = (source_text or "").strip() or title
@@ -63,6 +86,12 @@ class PaperSummarizer:
 
         try:
             raw = await self.openrouter_client.chat_completion(messages)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in _COOLDOWN_STATUSES:
+                self._start_cooldown(exc.response)
+            else:
+                logger.warning("Paper summarization failed: %s", exc)
+            return None
         except (OpenRouterError, Exception) as exc:
             logger.warning("Paper summarization failed: %s", exc)
             return None

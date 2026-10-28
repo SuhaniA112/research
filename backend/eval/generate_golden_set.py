@@ -10,6 +10,8 @@ Usage:
 import argparse
 import asyncio
 import json
+
+import httpx
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -51,7 +53,31 @@ async def generate_question(paper: Paper) -> str:
         },
         {"role": "user", "content": f"Title: {paper.title}\n\nText: {indexable_text}"},
     ]
-    return (await client.chat_completion(messages)).strip()
+    for attempt in range(4):
+        try:
+            return (await client.chat_completion(messages)).strip()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            body = exc.response.text.lower()
+            if status == 429 and "per-day" in body:
+                raise DailyLimitReached from exc
+            if status not in (429, 502, 503) or attempt == 3:
+                raise
+            try:
+                wait = float(exc.response.headers.get("retry-after", 0)) or 15.0 * (attempt + 1)
+            except ValueError:
+                wait = 15.0 * (attempt + 1)
+            print(f"  OpenRouter {status}; retrying in {wait:.0f}s")
+            await asyncio.sleep(min(wait, 120))
+    raise RuntimeError("unreachable")
+
+
+class DailyLimitReached(Exception):
+    """Free-tier daily request cap hit; progress so far is kept."""
+
+
+# Free models allow ~20 requests/minute.
+REQUEST_SPACING_S = 3.5
 
 
 def load_golden_set() -> dict:
@@ -83,12 +109,23 @@ async def main() -> None:
     )
     args = parser.parse_args()
 
+    if not settings.openrouter_api_key.strip():
+        raise SystemExit("OPENROUTER_API_KEY is empty in backend/.env (a free key works).")
+
     papers = await sample_project_papers(args.project_id, args.count)
     if not papers:
         print(f"No papers saved to project {args.project_id}. Save some papers first.")
         return
 
     data = load_golden_set()
+    old_project = data.get("project_id")
+    if data["items"] and old_project and old_project != str(args.project_id):
+        # New project: archive the old set (git-ignored) and start fresh.
+        archive = GOLDEN_SET_PATH.parent / "results" / f"golden_set-{old_project}.json"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        archive.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        print(f"Archived previous project's golden set to {archive}")
+        data = {**data, "items": []}
     existing_keys = {(item["source"], item["external_id"]) for item in data["items"]}
     next_index = len(data["items"]) + 1
 
@@ -97,7 +134,15 @@ async def main() -> None:
         if key in existing_keys and not args.overwrite:
             continue
 
-        question = await generate_question(paper)
+        try:
+            question = await generate_question(paper)
+        except DailyLimitReached:
+            print("OpenRouter's free daily limit is used up; saved what was generated. "
+                  "Rerun tomorrow to continue (already-done papers are skipped).")
+            break
+        except httpx.HTTPStatusError as exc:
+            print(f"OpenRouter error {exc.response.status_code}; saved progress, rerun to continue.")
+            break
         item = {
             "id": f"g{next_index}",
             "source": paper.source,
@@ -115,6 +160,9 @@ async def main() -> None:
         existing_keys.add(key)
         next_index += 1
         print(f"[{item['id']}] {paper.title!r} -> {question}")
+        data["project_id"] = str(args.project_id)
+        save_golden_set(data)  # keep progress if a later request fails
+        await asyncio.sleep(REQUEST_SPACING_S)
 
     data["generated_at"] = datetime.now(timezone.utc).isoformat()
     data["generator_model"] = settings.openrouter_model

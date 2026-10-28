@@ -18,12 +18,18 @@ Then open http://localhost:5173
 `npm run setup` copies env files, starts Postgres, installs deps, and runs migrations.
 `npm run dev` brings up the DB (if needed) and both servers.
 
+**After pulling new changes**, run `npm run db:migrate` (with the DB up) to apply new
+migrations, and `npm run setup` again if dependencies changed.
+
 ### Optional API keys
 
 Edit `backend/.env`:
 
 - `VOYAGE_API_KEY` — faster discovery + embeddings on save
 - `OPENROUTER_API_KEY` — ask / generation
+  (optional: without it, or when free-tier limits hit, summaries fall back to the abstract and OpenRouter is paused for the `Retry-After` window)
+- `SEMANTIC_SCHOLAR_API_KEY` — optional; without it Semantic Scholar often rate-limits (429)
+- `OPENALEX_MAILTO` — optional contact email for OpenAlex's more reliable "polite pool"
 
 ### Frontend-only (mocks)
 
@@ -54,6 +60,13 @@ npm run dev:mock
 2. `npm run dev` (or at least API + Postgres)
 3. `npm run e2e`
 
+### Benchmarks
+
+`npm run bench` builds this checkout and `main`, then compares how much JS/CSS the
+login page downloads (gzip). With the API running it also times the hub and the
+project overview against the old request patterns (`--runs`, `--user-id`,
+`--baseline <ref>` to change defaults). Results land in `.bench/latest.md`.
+
 ### Retrieval evaluation
 
 Scripts live in `backend/eval/`; results go to `backend/eval/results/` (git-ignored).
@@ -70,7 +83,13 @@ Scripts live in `backend/eval/`; results go to `backend/eval/results/` (git-igno
    reports vector norms, anisotropy, effective dimensionality, hubness, a 2-D PCA layout of
    papers, and — with a golden set — relevant-vs-irrelevant similarity separation (ROC AUC)
    with a distance-threshold sweep for tuning `RETRIEVAL_MAX_DISTANCE`.
-4. **Report** — `npm run eval:report` writes `backend/eval/results/report.html` with charts
+4. **Weight tuning** — `npm run eval:tune -- --project-id <uuid> [--distractors 50] [--write]` ranks
+   each question against the project's saved papers plus its 50 nearest unsaved papers, scores the
+   golden set with the weighted relevance model (vector similarity + project fit +
+   saved-paper similarity + recency + citations + topic overlap), grid-searches the
+   weights, and reports raw-similarity baseline vs current vs tuned (leave-one-out).
+   `--write` saves `backend/app/services/recommendation/weights.json`; restart the API.
+5. **Report** — `npm run eval:report` writes `backend/eval/results/report.html` with charts
    for all of the above. It is a single file with no external assets.
 
 Metric and diagnostic math is unit-tested in `backend/tests/unit/test_eval_*.py`

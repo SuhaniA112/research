@@ -130,7 +130,12 @@ async function searchLegacyPapers(query: string): Promise<Source[]> {
 
 export async function searchSources(
   query = "",
-  options?: { fallbackToLegacy?: boolean; projectId?: string },
+  options?: {
+    fallbackToLegacy?: boolean;
+    projectId?: string;
+    limit?: number;
+    page?: number;
+  },
 ): Promise<Source[]> {
   const fallbackToLegacy = options?.fallbackToLegacy !== false;
   const projectId = options?.projectId;
@@ -154,7 +159,8 @@ export async function searchSources(
     const response = await searchResearch({
       query: trimmed,
       project_id: projectId,
-      limit: 20,
+      limit: options?.limit ?? 20,
+      ...(options?.page ? { page: options.page } : {}),
     });
     return response.results.map((item) => {
       const paper = item.paper;

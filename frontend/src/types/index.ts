@@ -19,6 +19,8 @@ export interface Source {
   /** null = soft placeholder until scoring APIs exist */
   relevance: number | null;
   similarity: number | null;
+  /** Ranking blend (search + project + saved), 0-1, when scored for a project. */
+  matchScore?: number | null;
   citations: number | null;
   citesSaved: number | null;
   citedBySaved: number | null;
@@ -27,6 +29,8 @@ export interface Source {
   keyFindings: { text: string; section: string }[];
   /** Leveled AI summaries when available. */
   summaries?: SourceSummaries;
+  /** "extractive" = built from the abstract while the AI model is unavailable. */
+  summarySource?: "ai" | "extractive" | null;
   publicationUrl: string;
   externalId?: string;
   pdfUrl?: string | null;

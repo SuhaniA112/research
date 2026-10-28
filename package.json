@@ -11,12 +11,15 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "node scripts/py.mjs --backend -m alembic upgrade head",
     "e2e": "node scripts/py.mjs scripts/e2e_save_ask.py",
     "eval": "node scripts/py.mjs --backend -m eval.run_eval",
     "eval:golden": "node scripts/py.mjs --backend -m eval.generate_golden_set",
     "eval:diagnostics": "node scripts/py.mjs --backend -m eval.diagnose_embeddings",
     "eval:report": "node scripts/py.mjs --backend -m eval.report",
-    "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api"
+    "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api",
+    "bench": "node scripts/bench.mjs",
+    "eval:tune": "node scripts/py.mjs --backend -m eval.tune_weights"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -157,8 +157,10 @@ class DiscoverySearchService:
             request, user_id=user_id
         )
         limit = request.limit or self.settings.search_default_limit
-        force_refresh = request.force_refresh
-        progressive = request.progressive
+        page = request.page
+        # Paging always asks providers for their next results.
+        force_refresh = request.force_refresh or page > 0
+        progressive = request.progressive and page == 0
 
         [query_embedding] = await self.voyage_client.embed(
             [normalized], input_type="query"
@@ -278,7 +280,7 @@ class DiscoverySearchService:
             await self.paper_repo.session.flush()
 
             t_providers = time.perf_counter()
-            provider_stats = await self._call_providers(normalized, limit=limit)
+            provider_stats = await self._call_providers(normalized, limit=limit, page=page)
             provider_fetch_ms = (time.perf_counter() - t_providers) * 1000
             external_search_performed = True
 
@@ -311,7 +313,9 @@ class DiscoverySearchService:
                     cand.origins.add("database")
             page1_process_ms = (time.perf_counter() - t_rerank) * 1000
 
-        ranked = self._rank_candidates(candidates)[:limit]
+        # Later pages show only what providers returned for that page.
+        pool = [c for c in candidates if "external" in c.origins] if page > 0 else candidates
+        ranked = self._rank_candidates(pool)[:limit]
         results = self._to_result_items(ranked)
         time_to_first_results_ms = (time.perf_counter() - started) * 1000
 
@@ -808,10 +812,12 @@ class DiscoverySearchService:
             if intent:
                 return intent, normalize_query(intent)
 
-        if self.profile_repo is not None:
-            profile = await self.profile_repo.ensure_singleton()
-            intent = build_intent_query_from_topics(
-                profile.research_areas, profile.keywords
+        if self.profile_repo is not None and user_id is not None:
+            profile = await self.profile_repo.get_for_user(user_id)
+            intent = (
+                build_intent_query_from_topics(profile.research_areas, profile.keywords)
+                if profile is not None
+                else ""
             )
             if intent:
                 return intent, normalize_query(intent)
@@ -966,14 +972,17 @@ class DiscoverySearchService:
         return True, None
 
     async def _iter_provider_batches(
-        self, query: str, *, limit: int
+        self, query: str, *, limit: int, page: int = 0
     ) -> AsyncIterator[_ProviderBatch]:
         """Run providers concurrently; yield each batch as it finishes."""
         if not self.clients:
             return
         per_provider = max(5, (limit + len(self.clients) - 1) // len(self.clients))
+        offset = page * per_provider
         tasks = [
-            asyncio.create_task(self._search_one_provider(client, query, per_provider))
+            asyncio.create_task(
+                self._search_one_provider(client, query, per_provider, offset)
+            )
             for client in self.clients
         ]
         for finished in asyncio.as_completed(tasks):
@@ -984,6 +993,7 @@ class DiscoverySearchService:
         client: ResearchSourceClient,
         query: str,
         per_provider: int,
+        offset: int = 0,
     ) -> _ProviderBatch:
         name = client.__class__.__name__.replace("Client", "").lower()
         label_map = {
@@ -994,7 +1004,9 @@ class DiscoverySearchService:
         }
         label = label_map.get(name, name)
         try:
-            results = await client.search(query, max_results=per_provider)
+            # Only pass offset when paging, so simple clients keep working.
+            paging = {"offset": offset} if offset else {}
+            results = await client.search(query, max_results=per_provider, **paging)
             return _ProviderBatch(
                 label=label,
                 papers=[(paper, idx + 1) for idx, paper in enumerate(results)],
@@ -1014,9 +1026,11 @@ class DiscoverySearchService:
                 ),
             )
 
-    async def _call_providers(self, query: str, *, limit: int) -> _ProviderRunStats:
+    async def _call_providers(
+        self, query: str, *, limit: int, page: int = 0
+    ) -> _ProviderRunStats:
         stats = _ProviderRunStats()
-        async for batch in self._iter_provider_batches(query, limit=limit):
+        async for batch in self._iter_provider_batches(query, limit=limit, page=page):
             stats.attempted.append(batch.label)
             if batch.failure is not None:
                 stats.failed.append(batch.failure)

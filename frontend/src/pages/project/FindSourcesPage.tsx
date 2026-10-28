@@ -4,6 +4,11 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
 import {
+  applyCachedProjectScores,
+  fetchProjectSuggestions,
+  scoreForProject,
+} from "@/api/recommendations";
+import {
   recordSearch,
   rememberProjectSearchResults,
   searchSources,
@@ -72,12 +77,19 @@ function sortSources(sources: Source[], sortBy: SourceSortOption): Source[] {
       );
     case "relevance":
     default:
+      // Prefer the project-aware blend when scored; fall back to search relevance.
       return copy.sort(
         (a, b) =>
-          nullsLast(b.relevance) - nullsLast(a.relevance) || a.title.localeCompare(b.title),
+          nullsLast(b.matchScore ?? null) - nullsLast(a.matchScore ?? null) ||
+          nullsLast(b.relevance) - nullsLast(a.relevance) ||
+          a.title.localeCompare(b.title),
       );
   }
 }
+
+const SEARCH_LIMIT = 20;
+const SEARCH_LIMIT_MAX = 50; // backend max per search
+const MAX_PAGES = 10; // "search for more" pages per query
 
 export function FindSourcesPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -87,6 +99,12 @@ export function FindSourcesPage() {
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [results, setResults] = useState<Source[]>([]);
   const [visibleCount, setVisibleCount] = useState(3);
+  // Results fetched per search; "Search for more" raises it to the API max.
+  const [fetchLimit, setFetchLimit] = useState(SEARCH_LIMIT);
+  // Paging for typed searches: each "search for more" fetches the next provider page.
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exhausted, setExhausted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
@@ -116,11 +134,22 @@ export function FindSourcesPage() {
     const handle = window.setTimeout(() => {
       setLoading(true);
       setError(null);
-      void searchSources(search, { projectId })
+      // Empty box: quick suggestions from stored papers instead of a slow live search.
+      const load = search.trim()
+        ? searchSources(search, { projectId, limit: fetchLimit })
+        : fetchProjectSuggestions(projectId, fetchLimit);
+      void load
         .then((sources) => {
           if (cancelled) return;
-          setResults(sources);
-          setVisibleCount(3);
+          setResults(applyCachedProjectScores(projectId, sources));
+          // Score against this project (and the search) after first paint.
+          void scoreForProject(projectId, sources, search)
+            .then((scored) => {
+              if (!cancelled) setResults(scored);
+            })
+            .catch(() => undefined);
+          // Keep the position when this is a "search for more" refetch.
+          setVisibleCount((c) => (fetchLimit > SEARCH_LIMIT ? Math.max(c, 3) : 3));
           if (search.trim()) {
             void rememberProjectSearchResults(projectId, sources);
           }
@@ -143,7 +172,54 @@ export function FindSourcesPage() {
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [projectId, search, invalidateSearchHistory]);
+  }, [projectId, search, fetchLimit, invalidateSearchHistory]);
+
+  // A new query starts back at the default page size.
+  useEffect(() => {
+    setFetchLimit(SEARCH_LIMIT);
+    setPage(0);
+    setExhausted(false);
+  }, [search]);
+
+  function searchForMore() {
+    if (!projectId) return;
+    // Empty box: suggestions just widen to the API max.
+    if (!search.trim()) {
+      setVisibleCount((c) => c + 2);
+      setFetchLimit(SEARCH_LIMIT_MAX);
+      return;
+    }
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    void searchSources(search, {
+      projectId,
+      limit: SEARCH_LIMIT,
+      page: nextPage,
+      fallbackToLegacy: false,
+    })
+      .then((more) => {
+        const seen = new Set(results.flatMap((s) => [s.id, s.externalId ?? s.id]));
+        const fresh = more.filter((s) => !seen.has(s.id) && !seen.has(s.externalId ?? s.id));
+        setPage(nextPage);
+        if (fresh.length === 0) {
+          setExhausted(true);
+          return;
+        }
+        const merged = [...results, ...fresh];
+        setResults(applyCachedProjectScores(projectId, merged));
+        setVisibleCount((c) => c + Math.min(fresh.length, 5));
+        void rememberProjectSearchResults(projectId, fresh);
+        void scoreForProject(projectId, merged, search)
+          .then(setResults)
+          .catch(() => undefined);
+      })
+      .catch(() => setExhausted(true))
+      .finally(() => setLoadingMore(false));
+  }
+
+  const canSearchMore = search.trim()
+    ? !exhausted && page < MAX_PAGES
+    : fetchLimit < SEARCH_LIMIT_MAX && results.length >= fetchLimit;
 
   const yearAtFullRange = yearFrom === YEAR_MIN && yearTo === YEAR_MAX;
 
@@ -251,15 +327,23 @@ export function FindSourcesPage() {
       <div className="mt-6 space-y-4">
         {loading && (
           <p className="text-sm text-gray-500">
-            Searching… this can take up to a minute while we query external
-            research APIs.
+            {search.trim()
+              ? "Searching… this can take up to a minute while we query external research APIs."
+              : "Loading suggestions for this project…"}
+          </p>
+        )}
+        {!loading && !search.trim() && filtered.length > 0 && (
+          <p className="text-xs font-semibold tracking-wide text-gray-500">
+            SUGGESTED FOR THIS PROJECT
           </p>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         {!loading && !error && filtered.length === 0 && (
           <p className="text-sm text-gray-500">
             {results.length === 0
-              ? "No sources found. Try a different query, or leave the box empty to load default research results."
+              ? search.trim()
+                ? "No sources found. Try a different query."
+                : "No suggestions yet. Search above to find papers for this project."
               : "No sources match the current filters."}
           </p>
         )}
@@ -283,6 +367,27 @@ export function FindSourcesPage() {
           >
             LOAD MORE
           </button>
+        </div>
+      )}
+      {!loading && filtered.length > 0 && visibleCount >= filtered.length && (
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>
+            Showing all {filtered.length} matching paper{filtered.length === 1 ? "" : "s"}
+            {filtered.length < results.length ? " for these filters" : ""}.
+          </p>
+          {loadingMore ? (
+            <p className="mt-2 text-sm text-gray-400">Searching for more papers…</p>
+          ) : canSearchMore ? (
+            <button
+              type="button"
+              onClick={searchForMore}
+              className="mt-2 text-sm font-semibold tracking-wide text-brand-700 hover:underline"
+            >
+              SEARCH FOR MORE
+            </button>
+          ) : (
+            <p className="mt-1">No more results for this search. Try different keywords.</p>
+          )}
         </div>
       )}
     </div>

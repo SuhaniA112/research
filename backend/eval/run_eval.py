@@ -1,23 +1,6 @@
-"""Scores Retrieval and generation against golden_set.json, as separately-reported
-metrics (see CONTEXT.md's Eval decision: split, not blended, since they fail for
-different reasons).
+"""Score Retrieval (ranking metrics) and generation against golden_set.json.
 
-Retrieval is scored as a ranking problem: each golden question is embedded, the
-project's chunks are searched with pgvector, chunks are collapsed to a ranked list of
-papers (best chunk wins), and the list is scored with precision@k, recall@k, F1@k,
-hit@k, nDCG@k, MRR and MAP (eval/metrics.py). The production gate (the
-``retrieval_max_distance`` threshold and ``retrieval_top_k`` used by Ask) is reported
-separately as ``gated_hit``.
-
-A golden item names its relevant paper(s) either as a single ``source`` /
-``external_id`` pair, or as ``"relevant": [{"source", "external_id", "grade"?}, ...]``
-for multi-paper or graded (nDCG) judgments.
-
-Usage:
-    npm run eval -- --project-id <uuid> [--k 1 3 5 10] [--skip-generation]
-    python -m eval.run_eval --project-id <uuid> --out eval/results/run.json
-
-Then render charts with ``npm run eval:report`` (eval/report.py).
+Usage: npm run eval -- --project-id <uuid> [--k 1 3 5 10] [--skip-generation]
 """
 
 from __future__ import annotations

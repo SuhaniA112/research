@@ -1,23 +1,35 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { getAccessToken } from "@/lib/axios";
 import { isOnboardingComplete } from "@/lib/onboarding";
 import { LoginPage } from "@/pages/LoginPage";
-import { NotFoundPage } from "@/pages/NotFoundPage";
-import { HubPage } from "@/pages/HubPage";
-import { AllProjectsPage } from "@/pages/AllProjectsPage";
-import { NewProjectPage } from "@/pages/NewProjectPage";
-import { OnboardingPage } from "@/pages/OnboardingPage";
-import { ProfilePage } from "@/pages/ProfilePage";
-import { RecentSearchesPage } from "@/pages/RecentSearchesPage";
-import { ProjectOverviewPage } from "@/pages/project/ProjectOverviewPage";
-import { SavedSourcesPage } from "@/pages/project/SavedSourcesPage";
-import { MindMapPage } from "@/pages/project/MindMapPage";
-import { FindSourcesPage } from "@/pages/project/FindSourcesPage";
-import { SourceDetailPage } from "@/pages/project/SourceDetailPage";
 import { PublicLayout } from "@/layouts/PublicLayout";
-import { ProtectedLayout } from "@/layouts/ProtectedLayout";
-import { OnboardingLayout } from "@/layouts/OnboardingLayout";
+
+// Everything past login is code-split so the login screen loads a small bundle.
+const named = <T extends string>(load: () => Promise<Record<T, React.ComponentType>>, name: T) =>
+  lazy(() => load().then((m) => ({ default: m[name] })));
+
+const NotFoundPage = named(() => import("@/pages/NotFoundPage"), "NotFoundPage");
+const HubPage = named(() => import("@/pages/HubPage"), "HubPage");
+const AllProjectsPage = named(() => import("@/pages/AllProjectsPage"), "AllProjectsPage");
+const NewProjectPage = named(() => import("@/pages/NewProjectPage"), "NewProjectPage");
+const OnboardingPage = named(() => import("@/pages/OnboardingPage"), "OnboardingPage");
+const ProfilePage = named(() => import("@/pages/ProfilePage"), "ProfilePage");
+const RecentSearchesPage = named(() => import("@/pages/RecentSearchesPage"), "RecentSearchesPage");
+const ProjectOverviewPage = named(() => import("@/pages/project/ProjectOverviewPage"), "ProjectOverviewPage");
+const SavedSourcesPage = named(() => import("@/pages/project/SavedSourcesPage"), "SavedSourcesPage");
+const MindMapPage = named(() => import("@/pages/project/MindMapPage"), "MindMapPage");
+const FindSourcesPage = named(() => import("@/pages/project/FindSourcesPage"), "FindSourcesPage");
+const SourceDetailPage = named(() => import("@/pages/project/SourceDetailPage"), "SourceDetailPage");
+const ProtectedLayout = named(() => import("@/layouts/ProtectedLayout"), "ProtectedLayout");
+const OnboardingLayout = named(() => import("@/layouts/OnboardingLayout"), "OnboardingLayout");
+
+/** Warm the post-login chunks while the user is on the login screen. */
+export function prefetchAppShell(): void {
+  void import("@/layouts/ProtectedLayout");
+  void import("@/pages/HubPage");
+}
 
 function RequireAuth() {
   const token = getAccessToken();
@@ -58,6 +70,7 @@ function RedirectIfOnboardingComplete() {
 
 export function AppRoutes() {
   return (
+    <Suspense fallback={<p className="p-8 text-sm text-gray-500">Loading…</p>}>
     <Routes>
       <Route element={<PublicLayout />}>
         <Route element={<RedirectIfAuthenticated />}>
@@ -94,5 +107,6 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }

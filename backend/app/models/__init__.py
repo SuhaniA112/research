@@ -3,6 +3,7 @@ from app.models.chunk import Chunk
 from app.models.paper import Paper
 from app.models.profile import Profile
 from app.models.project import Project
+from app.models.project_embedding import ProjectEmbedding
 from app.models.project_paper import ProjectPaper
 from app.models.search_execution import SearchExecution
 from app.models.search_topic import SearchTopic
@@ -15,6 +16,7 @@ __all__ = [
     "Paper",
     "Profile",
     "Project",
+    "ProjectEmbedding",
     "ProjectPaper",
     "SearchExecution",
     "SearchTopic",

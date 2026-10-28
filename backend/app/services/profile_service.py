@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.models.profile import Profile
+from app.models.user import User
 from app.repositories.profile_repo import ProfileRepository
 from app.repositories.project_paper_repo import ProjectPaperRepository
 from app.repositories.project_repo import ProjectRepository
@@ -25,12 +26,12 @@ class ProfileService:
         self.project_repo = project_repo
         self.project_paper_repo = project_paper_repo
 
-    async def get_me(self) -> ProfileResponse:
-        profile = await self.profile_repo.ensure_singleton()
-        return await self._to_response(profile)
+    async def get_me(self, user: User) -> ProfileResponse:
+        profile = await self.profile_repo.ensure_for_user(user)
+        return await self._to_response(profile, user)
 
-    async def update_me(self, payload: ProfileUpdate) -> ProfileResponse:
-        profile = await self.profile_repo.ensure_singleton()
+    async def update_me(self, user: User, payload: ProfileUpdate) -> ProfileResponse:
+        profile = await self.profile_repo.ensure_for_user(user)
         update_data = payload.model_dump(exclude_unset=True)
         if "research_areas" in update_data and update_data["research_areas"] is not None:
             update_data["research_areas"] = normalize_topic_list(
@@ -43,19 +44,21 @@ class ProfileService:
         for field, value in update_data.items():
             setattr(profile, field, value)
         updated = await self.profile_repo.update(profile)
-        return await self._to_response(updated)
+        return await self._to_response(updated, user)
 
-    async def _to_response(self, profile: Profile) -> ProfileResponse:
-        projects_count = await self.project_repo.count_all()
-        sources_saved = await self.project_paper_repo.count_distinct_papers()
-        active = await self.project_repo.count_updated_since(_month_start_utc())
+    async def _to_response(self, profile: Profile, user: User) -> ProfileResponse:
+        projects_count = await self.project_repo.count_for_user(user.id)
+        sources_saved = await self.project_paper_repo.count_distinct_papers_for_user(user.id)
+        active = await self.project_repo.count_updated_since_for_user(
+            user.id, _month_start_utc()
+        )
         return ProfileResponse(
             name=profile.name,
             full_name=profile.full_name,
             email=profile.email,
             occupation=profile.occupation,
             institution=profile.institution,
-            member_since=_format_member_since(profile.created_at),
+            member_since=_format_member_since(user.created_at or profile.created_at),
             research_areas=list(profile.research_areas or []),
             keywords=list(profile.keywords or []),
             reading_level=profile.reading_level,  # type: ignore[arg-type]

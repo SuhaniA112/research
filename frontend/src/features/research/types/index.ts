@@ -30,6 +30,8 @@ export interface DiscoverySearchRequest {
   project_id?: string;
   limit?: number;
   force_refresh?: boolean;
+  /** >0 = next page of provider results ("search for more"). */
+  page?: number;
 }
 
 export interface ProviderFailure {

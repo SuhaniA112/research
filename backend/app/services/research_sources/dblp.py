@@ -7,11 +7,14 @@ from app.services.research_sources.base import ResearchSourceClient
 class DblpClient(ResearchSourceClient):
     BASE_URL = "https://dblp.org/search/publ/api"
 
-    async def search(self, query: str, max_results: int = 10) -> list[IndPaper]:
+    async def search(
+        self, query: str, max_results: int = 10, offset: int = 0
+    ) -> list[IndPaper]:
         params = {
             "q": query,
             "format": "json",
             "h": max_results,
+            "f": offset,
         }
 
         async with httpx.AsyncClient(timeout=20) as client:

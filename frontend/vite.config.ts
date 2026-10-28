@@ -7,6 +7,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          // Stable vendor chunks cache across deploys; charts load only with stats pages.
+          manualChunks: {
+            react: ["react", "react-dom", "react-router-dom"],
+            data: ["@tanstack/react-query", "axios"],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

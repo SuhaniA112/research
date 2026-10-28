@@ -21,12 +21,22 @@ export interface BackendPaper {
   summary_graduate?: string | null;
   summary_expert?: string | null;
   key_findings?: { text: string; section?: string }[];
+  summary_source?: "ai" | "extractive" | null;
   created_at?: string;
 }
 
 const paperCache = new Map<string, Source>();
 
 export function cacheSource(source: Source): Source {
+  // A refetch without scores shouldn't erase scores the cache already has.
+  const prev = paperCache.get(source.id);
+  if (prev && (source.relevance == null || source.similarity == null)) {
+    source = {
+      ...source,
+      relevance: source.relevance ?? prev.relevance,
+      similarity: source.similarity ?? prev.similarity,
+    };
+  }
   paperCache.set(source.id, source);
   if (source.externalId) {
     paperCache.set(source.externalId, source);
@@ -81,6 +91,7 @@ export function mapBackendPaperToSource(
         : null,
       expert: paper.summary_expert ? decodeHtmlEntities(paper.summary_expert) : null,
     },
+    summarySource: paper.summary_source ?? null,
     publicationUrl: paper.url ?? paper.pdf_url ?? "#",
     externalId: paper.external_id,
     pdfUrl: paper.pdf_url ?? null,

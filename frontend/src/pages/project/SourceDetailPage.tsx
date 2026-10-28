@@ -11,6 +11,7 @@ import {
 } from "@/api/notes";
 import { cacheSource } from "@/api/mappers";
 import { getProject } from "@/api/projects";
+import { applyCachedProjectScores, isPaperUuid, scoreForProject } from "@/api/recommendations";
 import {
   ensureSourceSummaries,
   getSource,
@@ -40,6 +41,8 @@ export function SourceDetailPage() {
   const location = useLocation();
   const [project, setProject] = useState<Project | null | undefined>(undefined);
   const [source, setSource] = useState<Source | null | undefined>(undefined);
+  // Project scores live apart from `source` so summary refetches can't wipe them.
+  const [scores, setScores] = useState<Pick<Source, "relevance" | "similarity"> | null>(null);
   const [summaryLevel, setSummaryLevel] = useState<SummaryLevel>("general");
   const [summaryText, setSummaryText] = useState("");
   const [relatedPapers, setRelatedPapers] = useState<Source[]>([]);
@@ -92,6 +95,22 @@ export function SourceDetailPage() {
     void getSource(sourceId).then((s) => {
       if (s) {
         setSource(s);
+        // Same numbers the list page showed (if known), then refreshed.
+        const [cached] = applyCachedProjectScores(projectId, [s]);
+        const hasCached = cached && (cached.relevance != null || cached.similarity != null);
+        setScores(
+          isPaperUuid(projectId) && hasCached
+            ? { relevance: cached.relevance, similarity: cached.similarity }
+            : null,
+        );
+        void scoreForProject(projectId, [s])
+          .then(([scored]) => {
+            // Only ever update to real numbers; never blank out what's shown.
+            if (scored && (scored.relevance != null || scored.similarity != null)) {
+              setScores({ relevance: scored.relevance, similarity: scored.similarity });
+            }
+          })
+          .catch(() => undefined);
         return;
       }
       if (!navState?.source) setSource(null);
@@ -238,10 +257,16 @@ export function SourceDetailPage() {
               {summaryText || source.description || "No summary available yet."}
             </p>
             {source.summaries?.[summaryLevel]?.trim() ? (
-              <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI Generated Description
-              </span>
+              source.summarySource === "extractive" ? (
+                <span className="mt-3 flex items-center gap-1 text-xs text-gray-500">
+                  Summary from abstract
+                </span>
+              ) : (
+                <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  AI Generated Description
+                </span>
+              )
             ) : null}
           </div>
 
@@ -352,7 +377,10 @@ export function SourceDetailPage() {
 
         <div className="space-y-6">
           <div className="overflow-hidden rounded-xl border border-gray-200">
-            <SourceMetricsPanel source={source} className="w-full border-l-0" />
+            <SourceMetricsPanel
+              source={scores ? { ...source, ...scores } : source}
+              className="w-full border-l-0"
+            />
           </div>
 
           <section>

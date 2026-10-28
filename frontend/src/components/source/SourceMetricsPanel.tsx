@@ -9,7 +9,7 @@ interface SourceMetricsPanelProps {
 }
 
 function formatMetric(value: number | null): string {
-  return value == null ? "[X]%" : `${value}%`;
+  return value == null ? "—" : `${value}%`;
 }
 
 export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPanelProps) {
@@ -65,10 +65,10 @@ export function SourceMetricsPanel({ source, className = "" }: SourceMetricsPane
           {source.citations == null ? "—" : source.citations.toLocaleString()} Citations
         </p>
         <p className="mt-1 text-xs text-gray-600">
-          Cites {source.citesSaved == null ? "[X]" : source.citesSaved} sources you have saved.
+          Cites {source.citesSaved == null ? "—" : source.citesSaved} sources you have saved.
         </p>
         <p className="text-xs text-gray-600">
-          Cited by {source.citedBySaved == null ? "[X]" : source.citedBySaved} sources you have
+          Cited by {source.citedBySaved == null ? "—" : source.citedBySaved} sources you have
           saved.
         </p>
       </div>

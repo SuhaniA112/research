@@ -259,6 +259,39 @@ async def test_force_refresh_calls_providers(repos, mock_voyage) -> None:
     assert "arxiv" in response.providers_succeeded
 
 
+class PagingProvider(ArxivClient):
+    async def search(self, query: str, max_results: int = 10, offset: int = 0):
+        self.offset = offset
+        return await super().search(query, max_results)
+
+
+@pytest.mark.asyncio
+async def test_next_page_skips_cache_and_returns_only_new_papers(repos, mock_voyage) -> None:
+    paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos
+    topic = _topic()
+    db_papers = [_paper() for _ in range(5)]
+    new_paper = _paper(title="Page Two Paper")
+    topic_repo.get_by_normalized_query.return_value = topic
+    chunk_repo.search_global.return_value = [(p, 0.1) for p in db_papers]
+    topic_paper_repo.list_papers_for_topic.return_value = []
+    topic_repo.mark_external_refresh.return_value = topic
+    execution_repo.record.return_value = _execution(search_topic_id=topic.id, cache_hit=False)
+    ind = IndPaper(title=new_paper.title, abstract="a", authors=["A"], year=2023,
+                   source="arxiv", external_id="ext-2")
+    paper_repo.upsert_from_ind_paper.return_value = (new_paper, True)
+    chunk_repo.get_for_papers.return_value = {}
+    chunk_repo.ensure_chunk_for_paper.return_value = (MagicMock(), True)
+    topic_paper_repo.upsert_association.return_value = (MagicMock(), True)
+    provider = PagingProvider([ind])
+
+    service = _build_service(repos, mock_voyage, _settings(search_cache_min_results=1), [provider])
+    response = await service.search(DiscoverySearchRequest(query="retrieval", limit=5, page=1))
+
+    assert response.cache_hit is False and response.external_search_performed is True
+    assert provider.offset == 5  # one provider x 5 per page
+    assert [r.paper.title for r in response.results] == ["Page Two Paper"]
+
+
 @pytest.mark.asyncio
 async def test_low_similarity_triggers_fallback(repos, mock_voyage) -> None:
     paper_repo, chunk_repo, topic_repo, execution_repo, topic_paper_repo = repos

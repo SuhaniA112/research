@@ -1,5 +1,6 @@
 import httpx
 
+from app.core.config import settings
 from app.schemas.research_papers import IndPaper
 from app.services.query_normalization import normalize_topic_list
 from app.services.research_sources.base import ResearchSourceClient
@@ -9,11 +10,17 @@ from app.services.taxonomy.paper_topics import build_paper_topics
 class OpenAlexClient(ResearchSourceClient):
     BASE_URL = "https://api.openalex.org/works"
 
-    async def search(self, query: str, max_results: int = 10) -> list[IndPaper]:
+    async def search(
+        self, query: str, max_results: int = 10, offset: int = 0
+    ) -> list[IndPaper]:
         params = {
             "search": query,
             "per-page": max_results,
+            # OpenAlex pages are 1-based and fixed-size.
+            "page": offset // max(max_results, 1) + 1,
         }
+        if settings.openalex_mailto:
+            params["mailto"] = settings.openalex_mailto  # "polite pool": more reliable
 
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(self.BASE_URL, params=params)

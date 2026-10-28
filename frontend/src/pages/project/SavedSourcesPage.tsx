@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getProject } from "@/api/projects";
+import { applyCachedProjectScores, scoreForProject } from "@/api/recommendations";
 import { listSavedSources, unsaveSource } from "@/api/sources";
 import { SavedSourceCard } from "@/components/cards/ArticleCard";
 import { ProjectLayoutHeader } from "@/components/layout/ProjectLayoutHeader";
@@ -41,7 +42,11 @@ export function SavedSourcesPage() {
 
   async function refreshSources(id: string) {
     const next = await listSavedSources(id);
-    setSources(next);
+    setSources(applyCachedProjectScores(id, next));
+    // Project-relative relevance/similarity, filled in after first paint.
+    void scoreForProject(id, next)
+      .then(setSources)
+      .catch(() => undefined);
   }
 
   useEffect(() => {
