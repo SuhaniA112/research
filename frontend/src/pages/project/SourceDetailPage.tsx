@@ -95,16 +95,20 @@ export function SourceDetailPage() {
     void getSource(sourceId).then((s) => {
       if (s) {
         setSource(s);
-        // Same numbers the list page showed, then refreshed.
+        // Same numbers the list page showed (if known), then refreshed.
         const [cached] = applyCachedProjectScores(projectId, [s]);
+        const hasCached = cached && (cached.relevance != null || cached.similarity != null);
         setScores(
-          isPaperUuid(projectId) && cached
+          isPaperUuid(projectId) && hasCached
             ? { relevance: cached.relevance, similarity: cached.similarity }
             : null,
         );
         void scoreForProject(projectId, [s])
           .then(([scored]) => {
-            if (scored) setScores({ relevance: scored.relevance, similarity: scored.similarity });
+            // Only ever update to real numbers; never blank out what's shown.
+            if (scored && (scored.relevance != null || scored.similarity != null)) {
+              setScores({ relevance: scored.relevance, similarity: scored.similarity });
+            }
           })
           .catch(() => undefined);
         return;
