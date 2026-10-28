@@ -92,6 +92,14 @@ async def main() -> None:
         return
 
     data = load_golden_set()
+    old_project = data.get("project_id")
+    if data["items"] and old_project and old_project != str(args.project_id):
+        # New project: archive the old set (git-ignored) and start fresh.
+        archive = GOLDEN_SET_PATH.parent / "results" / f"golden_set-{old_project}.json"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        archive.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        print(f"Archived previous project's golden set to {archive}")
+        data = {**data, "items": []}
     existing_keys = {(item["source"], item["external_id"]) for item in data["items"]}
     next_index = len(data["items"]) + 1
 
