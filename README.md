@@ -54,6 +54,13 @@ npm run dev:mock
 2. `npm run dev` (or at least API + Postgres)
 3. `npm run e2e`
 
+### Benchmarks
+
+`npm run bench` builds this checkout and `main`, then compares how much JS/CSS the
+login page downloads (gzip). With the API running it also times the hub and the
+project overview against the old request patterns (`--runs`, `--user-id`,
+`--baseline <ref>` to change defaults). Results land in `.bench/latest.md`.
+
 ### Retrieval evaluation
 
 Scripts live in `backend/eval/`; results go to `backend/eval/results/` (git-ignored).

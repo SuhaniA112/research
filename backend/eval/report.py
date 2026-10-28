@@ -1,12 +1,6 @@
-"""Render eval + embedding-diagnostic results as one self-contained HTML report.
+"""Render eval + diagnostics JSON as one self-contained HTML report.
 
-No plotting libraries: charts are inline SVG, so the report opens in any browser
-and can be attached to a PR. Reads the JSON written by run_eval.py and
-diagnose_embeddings.py (latest of each in eval/results/ by default).
-
-Usage:
-    npm run eval:report
-    python -m eval.report --run eval/results/run-X.json --diagnostics eval/results/diagnostics-Y.json
+Usage: npm run eval:report [-- --run <json> --diagnostics <json>]
 """
 
 from __future__ import annotations

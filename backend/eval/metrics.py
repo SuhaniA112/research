@@ -1,15 +1,7 @@
-"""Information-retrieval metrics for scoring ranked Retrieval results.
+"""IR metrics: precision/recall/F1/hit/nDCG@k, MRR, MAP.
 
-Pure functions with no database or network dependencies, so they are unit-tested
-directly (tests/unit/test_eval_metrics.py) and reused by run_eval.py and report.py.
-
-Conventions
------------
-- ``ranked`` is the system's ranked list of document ids (best first, no duplicates).
-- ``relevant`` is the set of ids judged relevant for the query. For graded
-  relevance (nDCG only) pass a ``{id: gain}`` mapping instead; any id missing
-  from the mapping has gain 0.
-- ``k`` truncates the ranking. ``k=None`` means "the whole list".
+``ranked`` is a best-first list of ids; ``relevant`` is a set of ids or an
+``{id: gain}`` map for graded nDCG.
 """
 
 from __future__ import annotations

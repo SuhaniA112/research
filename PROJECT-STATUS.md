@@ -43,6 +43,14 @@ FastAPI + async SQLAlchemy + Postgres (pgvector). Schema is applied with **Alemb
   Multi-author percentages over saved papers (each counted only over papers with data),
   plus a 0–100 score and status label. Logic in `app/services/source_validity.py`
 
+**Recommendations & stats**
+
+- `GET /api/v1/digest` — personalised hub papers: interest + saved-paper embeddings,
+  pgvector ANN, MMR diversity, cached per user; paged, falls back to topic overlap
+- `GET /api/v1/papers/{id}/related`, `POST /api/v1/projects/{id}/similarity`
+- `GET /api/v1/projects/{id}/stats` — breakdown, recency, validity, topics in one call
+- Profiles are per user (`/users/me` scoped by the current user)
+
 **Auth**
 
 - `User` model / CRUD by UUID exists; **no** login/session/`/users/me` yet
@@ -65,10 +73,9 @@ React app talks to the API through `frontend/src/api/*` adapters.
    (ask is API-only for verification; **no Ask UI** — out of product scope)
 2. **Auth** — in progress on `auth-clerk-migration` (Clerk); login/session, `/users/me`,
    scope projects by `user_id`
-3. **Relevance / similarity %** — source cards still show `[X]%` badges
-4. **Related / citing papers** — source detail lists are empty
-5. **Profile password actions** — Change password / Delete account unfinished (depends on auth)
-6. **Validity backfill (optional)** — papers saved before migration `0009` only get
+3. **Citing papers** — needs a citation graph (Semantic Scholar/OpenAlex); still empty
+4. **Profile password actions** — Change password / Delete account unfinished (depends on auth)
+5. **Validity backfill (optional)** — papers saved before migration `0009` only get
    citation / venue / OA / peer-review data when a search re-fetches them
 
 ### Out of scope

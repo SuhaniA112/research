@@ -16,7 +16,8 @@
     "eval:golden": "node scripts/py.mjs --backend -m eval.generate_golden_set",
     "eval:diagnostics": "node scripts/py.mjs --backend -m eval.diagnose_embeddings",
     "eval:report": "node scripts/py.mjs --backend -m eval.report",
-    "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api"
+    "test:api": "node scripts/py.mjs --backend -m pytest tests/unit tests/api",
+    "bench": "node scripts/bench.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
