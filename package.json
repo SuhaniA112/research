@@ -11,6 +11,7 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "node scripts/py.mjs --backend -m alembic upgrade head",
     "e2e": "node scripts/py.mjs scripts/e2e_save_ask.py",
     "eval": "node scripts/py.mjs --backend -m eval.run_eval",
     "eval:golden": "node scripts/py.mjs --backend -m eval.generate_golden_set",

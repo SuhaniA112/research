@@ -18,6 +18,9 @@ Then open http://localhost:5173
 `npm run setup` copies env files, starts Postgres, installs deps, and runs migrations.
 `npm run dev` brings up the DB (if needed) and both servers.
 
+**After pulling new changes**, run `npm run db:migrate` (with the DB up) to apply new
+migrations, and `npm run setup` again if dependencies changed.
+
 ### Optional API keys
 
 Edit `backend/.env`:
