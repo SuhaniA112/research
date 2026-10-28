@@ -111,10 +111,6 @@ class RecommendationService:
         profile = await self.profile_repo.ensure_for_user(user)
         projects = await self.project_repo.list_for_user(user.id)
         interests = collect_interests(profile.research_areas, profile.keywords, projects)
-        now = datetime.now(timezone.utc)
-        if not interests:
-            return DigestResponse(generated_at=now)
-
         saved = await self.project_paper_repo.list_papers_for_user(user.id)
         saved_ids = sorted(p.id for p in saved)
         key = (tuple(interests), tuple(saved_ids), _week_start())
@@ -123,7 +119,10 @@ class RecommendationService:
         if not refresh and cached and cached[0] == key and cached[1] > time.time():
             ranked = cached[2]
         else:
-            ranked = await self._rank(interests, saved_ids)
+            ranked = await self._rank(interests, saved_ids) if interests else None
+            if not ranked or not ranked["entries"]:
+                # Never return an empty hub: fall back to recently added papers.
+                ranked = await self._rank_recent(set(saved_ids))
             _digest_cache[user.id] = (key, time.time() + DIGEST_TTL_SECONDS, ranked)
 
         entries = ranked["entries"]
@@ -145,7 +144,9 @@ class RecommendationService:
             total=len(entries),
             offset=offset,
             has_more=offset + limit < len(entries),
-            sparse=len(entries) < SPARSE_THRESHOLD,
+            # Tells the client to run a live search to grow the pool.
+            sparse=bool(interests)
+            and (ranked["method"] != "embedding" or len(entries) < SPARSE_THRESHOLD),
             method=ranked["method"],
             generated_at=ranked["generated_at"],
         )
@@ -201,6 +202,18 @@ class RecommendationService:
             for i in order
         ]
         return {"entries": entries, "method": "embedding", "generated_at": now}
+
+    async def _rank_recent(self, exclude: set[UUID]) -> dict:
+        papers = await self.paper_repo.list_recent(exclude=exclude, limit=MAX_RANKED)
+        entries = [
+            {"paper_id": p.id, "relevance": None, "similarity": None, "matched_interest": None}
+            for p in papers
+        ]
+        return {
+            "entries": entries,
+            "method": "recent" if entries else "none",
+            "generated_at": datetime.now(timezone.utc),
+        }
 
     async def _rank_lexical(self, interests, exclude, now) -> dict:
         """No embeddings available: rank stored papers by topic overlap."""

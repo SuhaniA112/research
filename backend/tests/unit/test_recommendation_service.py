@@ -47,6 +47,9 @@ def _service(papers, vectors, *, saved=(), interests=("vision", "nlp"), api_key=
     paper_repo = AsyncMock()
     paper_repo.get_many.side_effect = lambda ids: {i: by_id[i] for i in ids if i in by_id}
     paper_repo.find_by_topic_overlap.return_value = [(papers[0], 1)]
+    paper_repo.list_recent.side_effect = lambda exclude, limit: [
+        p for p in papers if p.id not in exclude
+    ][:limit]
     voyage = AsyncMock()
     voyage.api_key = api_key
     voyage.model = "m"
@@ -89,6 +92,17 @@ async def test_digest_falls_back_to_topics_without_key() -> None:
     result = await service.digest(SimpleNamespace(id=uuid4()))
     assert result.method == "lexical"
     assert result.items[0].matched_interest == "vision"
+    voyage.embed.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_digest_without_interests_shows_recent_papers() -> None:
+    a, saved = _paper("a"), _paper("saved")
+    service, voyage, _ = _service([a, saved], {}, saved=[saved], interests=())
+    result = await service.digest(SimpleNamespace(id=uuid4()))
+    assert result.method == "recent"
+    assert [i.paper.id for i in result.items] == [a.id]
+    assert result.sparse is False  # nothing to search for without interests
     voyage.embed.assert_not_awaited()
 
 

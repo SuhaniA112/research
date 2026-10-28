@@ -23,7 +23,7 @@ interface BackendDigest {
   offset: number;
   has_more: boolean;
   sparse: boolean;
-  method: "embedding" | "lexical" | "none";
+  method: "embedding" | "lexical" | "recent" | "none";
   generated_at: string;
 }
 
@@ -33,7 +33,8 @@ export interface DigestPage {
   total: number;
   hasMore: boolean;
   sparse: boolean;
-  method: BackendDigest["method"];
+  // "live": filled client-side from live searches when nothing stored matched.
+  method: BackendDigest["method"] | "live";
   generatedAt: string;
 }
 

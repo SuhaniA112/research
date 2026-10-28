@@ -24,7 +24,7 @@ class DigestResponse(BaseModel):
     has_more: bool = False
     # True when the database has few matches; the client may run a live search.
     sparse: bool = False
-    method: Literal["embedding", "lexical", "none"] = "none"
+    method: Literal["embedding", "lexical", "recent", "none"] = "none"
     generated_at: datetime
 
 

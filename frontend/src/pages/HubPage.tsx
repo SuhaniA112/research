@@ -83,7 +83,22 @@ export function HubPage() {
         if (!interest) return;
         enriched.current = true;
         await searchSources(interest, { fallbackToLegacy: false }).catch(() => []);
-        if (!cancelled) await refresh(true);
+        if (cancelled) return;
+        const next = await refresh(true);
+        if (cancelled || next.method === "embedding") return;
+        // Still no stored match: show live results for a few interests directly.
+        const batches = await Promise.all(
+          next.interests.slice(0, 3).map((q) => searchSources(q).catch(() => [] as Source[])),
+        );
+        const seen = new Set<string>();
+        const live = batches
+          .flat()
+          .filter((s) => !seen.has(s.id) && seen.add(s.id))
+          .sort((a, b) => (b.relevance ?? 0) - (a.relevance ?? 0))
+          .slice(0, FIRST_PAGE + MORE_PAGE);
+        if (!cancelled && live.length > 0) {
+          setDigest({ ...next, items: live, total: live.length, hasMore: false, method: "live" });
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Couldn't load recommendations. Refresh the page to try again.");
@@ -131,6 +146,21 @@ export function HubPage() {
           {interests.length > 8 ? "…" : ""}
           {loading && digest ? " · Updating…" : ""}
         </p>
+      ) : null}
+
+      {digest?.method === "recent" ? (
+        <p className="mt-2 text-xs text-gray-500">
+          {hasInterests
+            ? "No close matches for your interests yet, so these are recently added papers."
+            : "Showing recently added papers. "}
+          {!hasInterests ? (
+            <Link to="/profile" className="font-medium text-brand-700 hover:underline">
+              Add research areas to personalize.
+            </Link>
+          ) : null}
+        </p>
+      ) : digest?.method === "live" ? (
+        <p className="mt-2 text-xs text-gray-500">Fresh results from a live search of your interests.</p>
       ) : null}
 
       {error ? (

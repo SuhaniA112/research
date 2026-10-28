@@ -35,6 +35,12 @@ class PaperRepository(BaseRepository[Paper]):
         result = await self.session.execute(select(Paper).where(Paper.id.in_(paper_ids)))
         return {paper.id: paper for paper in result.scalars().all()}
 
+    async def list_recent(self, *, exclude: set[UUID], limit: int) -> list[Paper]:
+        """Newest stored papers not in ``exclude``."""
+        stmt = select(Paper).order_by(Paper.created_at.desc()).limit(limit + len(exclude))
+        result = await self.session.execute(stmt)
+        return [p for p in result.scalars().all() if p.id not in exclude][:limit]
+
     async def find_by_topic_overlap(
         self, topics: list[str], *, exclude: set[UUID], limit: int
     ) -> list[tuple[Paper, int]]:
