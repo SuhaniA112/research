@@ -4,6 +4,7 @@ import { Search, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
+import { scoreForProject } from "@/api/recommendations";
 import {
   deleteProjectSearch,
   getRecentProjectSearches,
@@ -71,7 +72,12 @@ export function ProjectOverviewPage() {
       return;
     }
     void getProject(projectId).then((p) => setProject(p ?? null));
-    void getViewNextSources(projectId, 2).then(setViewNext);
+    void getViewNextSources(projectId, 2)
+      .then((next) => {
+        setViewNext(next);
+        return scoreForProject(projectId, next).then(setViewNext);
+      })
+      .catch(() => undefined);
     void getRecentProjectSearches(projectId).then(setSearches);
     void getSourceBreakdown(projectId).then(setBreakdown);
     void getSourceRecency(projectId).then(setRecency);

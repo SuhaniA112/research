@@ -11,6 +11,7 @@ import {
 } from "@/api/notes";
 import { cacheSource } from "@/api/mappers";
 import { getProject } from "@/api/projects";
+import { scoreForProject } from "@/api/recommendations";
 import {
   ensureSourceSummaries,
   getSource,
@@ -92,6 +93,9 @@ export function SourceDetailPage() {
     void getSource(sourceId).then((s) => {
       if (s) {
         setSource(s);
+        void scoreForProject(projectId, [s])
+          .then(([scored]) => scored && setSource((prev) => (prev?.id === scored.id ? { ...prev, relevance: scored.relevance, similarity: scored.similarity } : prev)))
+          .catch(() => undefined);
         return;
       }
       if (!navState?.source) setSource(null);

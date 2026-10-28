@@ -17,7 +17,7 @@ import numpy as np
 
 from app.models.user import User
 from app.schemas.paper import PaperResponse
-from app.schemas.recommendation import DigestResponse, RecommendedPaper
+from app.schemas.recommendation import DigestResponse, PaperScore, RecommendedPaper
 from app.services.recommendation import ranking
 
 logger = logging.getLogger(__name__)
@@ -278,6 +278,59 @@ class RecommendationService:
             )
             for i in order
         ]
+
+    async def project_scores(
+        self, project, paper_ids: list[UUID], query: str | None = None
+    ) -> dict[str, PaperScore]:
+        """Score papers against a project: its description, its saved papers, and a query."""
+        out = {str(pid): PaperScore() for pid in paper_ids}
+        targets = await self._paper_vectors(paper_ids)
+        if not targets:
+            return out
+
+        project_text = ". ".join(
+            part
+            for part in (
+                project.name,
+                project.description or "",
+                ", ".join(project.topics or []),
+                ", ".join(project.keywords or []),
+            )
+            if part
+        )
+        texts = [project_text] + ([query.strip()] if query and query.strip() else [])
+        project_vec = query_vec = None
+        if getattr(self.voyage, "api_key", ""):
+            try:
+                vecs = await self._embed_queries(texts)
+                project_vec = ranking.unit(vecs[0])[0]
+                query_vec = ranking.unit(vecs[1])[0] if len(vecs) > 1 else None
+            except Exception as exc:  # noqa: BLE001 - rate limits etc.
+                logger.warning("project scores: embedding failed (%s)", exc)
+
+        saved = await self.project_paper_repo.list_papers_for_project(project.id)
+        saved_vecs = await self._paper_vectors([p.id for p in saved])
+        saved_ids = list(saved_vecs.keys())
+        saved_matrix = (
+            ranking.unit(np.stack([saved_vecs[s] for s in saved_ids])) if saved_ids else None
+        )
+
+        for pid, vec in targets.items():
+            v = ranking.unit(vec)[0]
+            relevance = float(project_vec @ v) if project_vec is not None else None
+            search = float(query_vec @ v) if query_vec is not None else None
+            similarity = None
+            if saved_matrix is not None:
+                # A saved paper is trivially identical to itself; compare to the others.
+                others = [s for sid, s in zip(saved_ids, saved_matrix @ v) if sid != pid]
+                similarity = float(max(others)) if others else None
+            out[str(pid)] = PaperScore(
+                relevance=ranking.to_percent(relevance),
+                similarity=ranking.to_percent(similarity),
+                search_match=ranking.to_percent(search),
+                score=ranking.blend_project_score(search, relevance, similarity),
+            )
+        return out
 
     async def similarity_to_saved(
         self, project_id: UUID, paper_ids: list[UUID]

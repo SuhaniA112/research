@@ -19,6 +19,8 @@ export interface Source {
   /** null = soft placeholder until scoring APIs exist */
   relevance: number | null;
   similarity: number | null;
+  /** Ranking blend (search + project + saved), 0-1, when scored for a project. */
+  matchScore?: number | null;
   citations: number | null;
   citesSaved: number | null;
   citedBySaved: number | null;

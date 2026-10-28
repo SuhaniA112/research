@@ -104,19 +104,40 @@ export async function fetchRelatedPapers(paperId: string, limit = 3): Promise<So
   return cacheSources(data.map(toSource));
 }
 
-/** Fill `similarity` (to the project's saved papers) on stored papers. */
-export async function withSimilarityToSaved(
+interface BackendPaperScore {
+  relevance: number | null;
+  similarity: number | null;
+  search_match: number | null;
+  score: number | null;
+}
+
+/**
+ * Score sources against a project: relevance = fit to the project,
+ * similarity = closeness to its saved papers, matchScore = ranking blend
+ * (including the search text when given). Missing scores keep prior values.
+ */
+export async function scoreForProject(
   projectId: string,
   sources: Source[],
+  query?: string,
 ): Promise<Source[]> {
+  if (!isPaperUuid(projectId)) return sources;
   const ids = sources.map((s) => s.id).filter(isPaperUuid).slice(0, 100);
   if (ids.length === 0) return sources;
-  const { data } = await apiClient.post<{ scores: Record<string, number | null> }>(
-    `/api/v1/projects/${projectId}/similarity`,
-    { paper_ids: ids },
+  const { data } = await apiClient.post<{ scores: Record<string, BackendPaperScore> }>(
+    `/api/v1/projects/${projectId}/scores`,
+    { paper_ids: ids, query: query?.trim() || null },
   );
-  return sources.map((s) => {
-    const score = data.scores[s.id];
-    return score == null ? s : { ...s, similarity: score };
-  });
+  return cacheSources(
+    sources.map((s) => {
+      const sc = data.scores[s.id];
+      if (!sc) return s;
+      return {
+        ...s,
+        relevance: sc.relevance ?? s.relevance,
+        similarity: sc.similarity ?? s.similarity,
+        matchScore: sc.score ?? s.matchScore ?? null,
+      };
+    }),
+  );
 }

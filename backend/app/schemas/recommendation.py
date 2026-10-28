@@ -28,9 +28,18 @@ class DigestResponse(BaseModel):
     generated_at: datetime
 
 
-class SimilarityRequest(BaseModel):
+class ScoresRequest(BaseModel):
     paper_ids: list[UUID] = Field(max_length=100)
+    # Optional search text; adds a search_match score and weights the ranking.
+    query: str | None = Field(default=None, max_length=500)
 
 
-class SimilarityResponse(BaseModel):
-    scores: dict[str, int | None] = Field(default_factory=dict)
+class PaperScore(BaseModel):
+    relevance: int | None = None  # 0-100 match to the project
+    similarity: int | None = None  # 0-100 match to the project's saved papers
+    search_match: int | None = None  # 0-100 match to the query, when given
+    score: float | None = None  # blended 0-1 ranking score
+
+
+class ScoresResponse(BaseModel):
+    scores: dict[str, PaperScore] = Field(default_factory=dict)

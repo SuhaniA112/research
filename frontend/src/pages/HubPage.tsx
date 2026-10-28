@@ -7,6 +7,7 @@ import { listProjects } from "@/api/projects";
 import {
   fetchDigestPage,
   readDigestSnapshot,
+  scoreForProject,
   writeDigestSnapshot,
   type DigestPage,
 } from "@/api/recommendations";
@@ -55,6 +56,7 @@ export function HubPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [projectId, setProjectId] = useState<string | undefined>(undefined);
+  const [projectName, setProjectName] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const enriched = useRef(false);
 
@@ -72,7 +74,11 @@ export function HubPage() {
     let cancelled = false;
     void getProfile().then((p) => !cancelled && setProfile(p)).catch(() => undefined);
     void listProjects()
-      .then((projects) => !cancelled && setProjectId(projects[0]?.id))
+      .then((projects) => {
+        if (cancelled) return;
+        setProjectId(projects[0]?.id);
+        setProjectName(projects[0]?.name);
+      })
       .catch(() => undefined);
 
     void refresh()
@@ -111,6 +117,25 @@ export function HubPage() {
     };
   }, [refresh]);
 
+  // Card scores are relative to the most recent project, like everywhere else.
+  const itemIds = digest?.items.map((s) => s.id).join(",") ?? "";
+  useEffect(() => {
+    if (env.useMocks || !projectId || !digest?.items.length) return;
+    let cancelled = false;
+    void scoreForProject(projectId, digest.items)
+      .then((scored) => {
+        if (cancelled) return;
+        setDigest((d) =>
+          d && d.items.map((s) => s.id).join(",") === itemIds ? { ...d, items: scored } : d,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, itemIds]);
+
   async function loadMore() {
     if (!digest) return;
     setLoadingMore(true);
@@ -148,6 +173,11 @@ export function HubPage() {
         </p>
       ) : null}
 
+      {projectName && digest?.items.length ? (
+        <p className="mt-1 text-xs text-gray-500">
+          Relevance and similarity are scored for your project &ldquo;{projectName}&rdquo;.
+        </p>
+      ) : null}
       {digest?.method === "recent" ? (
         <p className="mt-2 text-xs text-gray-500">
           {hasInterests

@@ -83,6 +83,24 @@ def mmr(
     return chosen
 
 
+# Find Sources ranking: the search matters most, then fit to the project.
+SEARCH_WEIGHT, PROJECT_WEIGHT, SAVED_WEIGHT = 0.5, 0.35, 0.15
+
+
+def blend_project_score(
+    search: float | None, relevance: float | None, similarity: float | None
+) -> float | None:
+    """Weighted mean of the available scores (weights renormalised)."""
+    parts = [
+        (w, s)
+        for w, s in ((SEARCH_WEIGHT, search), (PROJECT_WEIGHT, relevance), (SAVED_WEIGHT, similarity))
+        if s is not None
+    ]
+    if not parts:
+        return None
+    return round(sum(w * s for w, s in parts) / sum(w for w, _ in parts), 4)
+
+
 def to_percent(similarity: float | None) -> int | None:
     """Cosine similarity -> 0..100 for display."""
     if similarity is None or np.isnan(similarity):

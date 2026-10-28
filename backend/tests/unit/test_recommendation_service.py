@@ -131,6 +131,22 @@ async def test_digest_survives_embedding_outage_using_saved_papers() -> None:
 
 
 @pytest.mark.asyncio
+async def test_project_scores_use_project_text_query_and_saved() -> None:
+    a, s = _paper("a"), _paper("s")
+    # Project text embeds like "vision" ([1,0,0]); query "nlp" -> [0,1,0].
+    service, voyage, _ = _service([a, s], {a.id: [1, 0, 0], s.id: [0, 1, 0]}, saved=[s])
+    voyage.embed.side_effect = lambda texts, **kw: [
+        [1.0, 0.0, 0.0] if i == 0 else [0.0, 1.0, 0.0] for i, _ in enumerate(texts)
+    ]
+    project = SimpleNamespace(id=uuid4(), name="Vision", description="", topics=[], keywords=[])
+    scores = await service.project_scores(project, [a.id, s.id], query="nlp")
+    pa, ps = scores[str(a.id)], scores[str(s.id)]
+    assert (pa.relevance, pa.search_match, pa.similarity) == (100, 0, 0)
+    assert ps.similarity is None  # only itself is saved
+    assert pa.score is not None and ps.score is not None
+
+
+@pytest.mark.asyncio
 async def test_related_skips_the_paper_itself() -> None:
     a, b = _paper("a"), _paper("b")
     service, _, _ = _service([a, b], {a.id: [1, 0, 0], b.id: [0.9, 0.1, 0]})

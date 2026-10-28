@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
-import { withSimilarityToSaved } from "@/api/recommendations";
+import { scoreForProject } from "@/api/recommendations";
 import {
   recordSearch,
   rememberProjectSearchResults,
@@ -73,9 +73,12 @@ function sortSources(sources: Source[], sortBy: SourceSortOption): Source[] {
       );
     case "relevance":
     default:
+      // Prefer the project-aware blend when scored; fall back to search relevance.
       return copy.sort(
         (a, b) =>
-          nullsLast(b.relevance) - nullsLast(a.relevance) || a.title.localeCompare(b.title),
+          nullsLast(b.matchScore ?? null) - nullsLast(a.matchScore ?? null) ||
+          nullsLast(b.relevance) - nullsLast(a.relevance) ||
+          a.title.localeCompare(b.title),
       );
   }
 }
@@ -126,8 +129,8 @@ export function FindSourcesPage() {
         .then((sources) => {
           if (cancelled) return;
           setResults(sources);
-          // Fill "% similar to your saved papers" after first paint.
-          void withSimilarityToSaved(projectId, sources)
+          // Score against this project (and the search) after first paint.
+          void scoreForProject(projectId, sources, search)
             .then((scored) => {
               if (!cancelled) setResults(scored);
             })

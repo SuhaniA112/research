@@ -6,8 +6,8 @@ from app.api.deps import CurrentUserDep, ProjectRepoDep, RecommendationServiceDe
 from app.schemas.recommendation import (
     DigestResponse,
     RecommendedPaper,
-    SimilarityRequest,
-    SimilarityResponse,
+    ScoresRequest,
+    ScoresResponse,
 )
 
 router = APIRouter()
@@ -35,16 +35,17 @@ async def get_related_papers(
     return await service.related(paper_id, limit=limit)
 
 
-@router.post("/projects/{project_id}/similarity", response_model=SimilarityResponse)
-async def get_similarity_to_saved(
+@router.post("/projects/{project_id}/scores", response_model=ScoresResponse)
+async def score_papers_for_project(
     project_id: UUID,
-    payload: SimilarityRequest,
+    payload: ScoresRequest,
     service: RecommendationServiceDep,
     project_repo: ProjectRepoDep,
     current_user: CurrentUserDep,
-) -> SimilarityResponse:
-    """How close each paper is to the project's saved papers."""
-    if await project_repo.get_for_user(project_id, current_user.id) is None:
+) -> ScoresResponse:
+    """Relevance to the project, similarity to its saved papers, and an optional query match."""
+    project = await project_repo.get_for_user(project_id, current_user.id)
+    if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    scores = await service.similarity_to_saved(project_id, payload.paper_ids)
-    return SimilarityResponse(scores=scores)
+    scores = await service.project_scores(project, payload.paper_ids, payload.query)
+    return ScoresResponse(scores=scores)

@@ -47,3 +47,12 @@ def test_to_percent_and_diversity() -> None:
     assert r.to_percent(float("nan")) is None
     assert r.intra_list_diversity(np.eye(3)) == pytest.approx(1.0)
     assert r.intra_list_diversity(np.ones((3, 2))) == pytest.approx(0.0)
+
+
+def test_blend_project_score_renormalises_missing_parts() -> None:
+    assert r.blend_project_score(None, None, None) is None
+    assert r.blend_project_score(None, 0.6, None) == pytest.approx(0.6)
+    full = r.blend_project_score(1.0, 0.0, 0.0)
+    assert full == pytest.approx(r.SEARCH_WEIGHT)
+    no_search = r.blend_project_score(None, 1.0, 0.0)
+    assert no_search == pytest.approx(r.PROJECT_WEIGHT / (r.PROJECT_WEIGHT + r.SAVED_WEIGHT))
