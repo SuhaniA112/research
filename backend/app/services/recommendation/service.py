@@ -279,6 +279,29 @@ class RecommendationService:
             for i in order
         ]
 
+    async def project_suggestions(self, project, *, limit: int = 10) -> list[RecommendedPaper]:
+        """Stored papers that fit a project (its text + saved papers), excluding saved ones."""
+        project_text = ". ".join(
+            p for p in (project.name, project.description or "",
+                        ", ".join(project.topics or []), ", ".join(project.keywords or [])) if p
+        )
+        saved = await self.project_paper_repo.list_papers_for_project(project.id)
+        saved_ids = sorted(p.id for p in saved)
+        ranked = await self._rank([project_text], saved_ids)
+        if not ranked["entries"]:
+            ranked = await self._rank_recent(set(saved_ids))
+        page = ranked["entries"][:limit]
+        papers = await self.paper_repo.get_many([e["paper_id"] for e in page])
+        return [
+            RecommendedPaper(
+                paper=PaperResponse.model_validate(papers[e["paper_id"]]),
+                relevance=e["relevance"],
+                similarity=e["similarity"],
+            )
+            for e in page
+            if e["paper_id"] in papers
+        ]
+
     async def project_scores(
         self, project, paper_ids: list[UUID], query: str | None = None
     ) -> dict[str, PaperScore]:

@@ -104,6 +104,16 @@ export async function fetchRelatedPapers(paperId: string, limit = 3): Promise<So
   return cacheSources(data.map(toSource));
 }
 
+/** Stored papers that fit a project (no live search); used for an empty search box. */
+export async function fetchProjectSuggestions(projectId: string, limit = 12): Promise<Source[]> {
+  if (!isPaperUuid(projectId)) return [];
+  const { data } = await apiClient.get<BackendRecommended[]>(
+    `/api/v1/projects/${projectId}/suggestions`,
+    { params: { limit } },
+  );
+  return cacheSources(data.map(toSource));
+}
+
 interface BackendPaperScore {
   relevance: number | null;
   similarity: number | null;

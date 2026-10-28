@@ -35,6 +35,21 @@ async def get_related_papers(
     return await service.related(paper_id, limit=limit)
 
 
+@router.get("/projects/{project_id}/suggestions", response_model=list[RecommendedPaper])
+async def get_project_suggestions(
+    project_id: UUID,
+    service: RecommendationServiceDep,
+    project_repo: ProjectRepoDep,
+    current_user: CurrentUserDep,
+    limit: int = Query(default=10, ge=1, le=30),
+) -> list[RecommendedPaper]:
+    """Stored papers that fit the project; no live provider search."""
+    project = await project_repo.get_for_user(project_id, current_user.id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    return await service.project_suggestions(project, limit=limit)
+
+
 @router.post("/projects/{project_id}/scores", response_model=ScoresResponse)
 async def score_papers_for_project(
     project_id: UUID,

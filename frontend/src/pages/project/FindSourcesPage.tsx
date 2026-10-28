@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getProject } from "@/api/projects";
-import { scoreForProject } from "@/api/recommendations";
+import { fetchProjectSuggestions, scoreForProject } from "@/api/recommendations";
 import {
   recordSearch,
   rememberProjectSearchResults,
@@ -125,7 +125,11 @@ export function FindSourcesPage() {
     const handle = window.setTimeout(() => {
       setLoading(true);
       setError(null);
-      void searchSources(search, { projectId, limit: fetchLimit })
+      // Empty box: quick suggestions from stored papers instead of a slow live search.
+      const load = search.trim()
+        ? searchSources(search, { projectId, limit: fetchLimit })
+        : fetchProjectSuggestions(projectId, fetchLimit);
+      void load
         .then((sources) => {
           if (cancelled) return;
           setResults(sources);
@@ -272,15 +276,23 @@ export function FindSourcesPage() {
       <div className="mt-6 space-y-4">
         {loading && (
           <p className="text-sm text-gray-500">
-            Searching… this can take up to a minute while we query external
-            research APIs.
+            {search.trim()
+              ? "Searching… this can take up to a minute while we query external research APIs."
+              : "Loading suggestions for this project…"}
+          </p>
+        )}
+        {!loading && !search.trim() && filtered.length > 0 && (
+          <p className="text-xs font-semibold tracking-wide text-gray-500">
+            SUGGESTED FOR THIS PROJECT
           </p>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         {!loading && !error && filtered.length === 0 && (
           <p className="text-sm text-gray-500">
             {results.length === 0
-              ? "No sources found. Try a different query, or leave the box empty to load default research results."
+              ? search.trim()
+                ? "No sources found. Try a different query."
+                : "No suggestions yet. Search above to find papers for this project."
               : "No sources match the current filters."}
           </p>
         )}

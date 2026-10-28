@@ -41,6 +41,8 @@ export function SourceDetailPage() {
   const location = useLocation();
   const [project, setProject] = useState<Project | null | undefined>(undefined);
   const [source, setSource] = useState<Source | null | undefined>(undefined);
+  // Project scores live apart from `source` so summary refetches can't wipe them.
+  const [scores, setScores] = useState<Pick<Source, "relevance" | "similarity"> | null>(null);
   const [summaryLevel, setSummaryLevel] = useState<SummaryLevel>("general");
   const [summaryText, setSummaryText] = useState("");
   const [relatedPapers, setRelatedPapers] = useState<Source[]>([]);
@@ -93,8 +95,11 @@ export function SourceDetailPage() {
     void getSource(sourceId).then((s) => {
       if (s) {
         setSource(s);
+        setScores(null);
         void scoreForProject(projectId, [s])
-          .then(([scored]) => scored && setSource((prev) => (prev?.id === scored.id ? { ...prev, relevance: scored.relevance, similarity: scored.similarity } : prev)))
+          .then(([scored]) => {
+            if (scored) setScores({ relevance: scored.relevance, similarity: scored.similarity });
+          })
           .catch(() => undefined);
         return;
       }
@@ -356,7 +361,10 @@ export function SourceDetailPage() {
 
         <div className="space-y-6">
           <div className="overflow-hidden rounded-xl border border-gray-200">
-            <SourceMetricsPanel source={source} className="w-full border-l-0" />
+            <SourceMetricsPanel
+              source={scores ? { ...source, relevance: scores.relevance ?? source.relevance, similarity: scores.similarity ?? source.similarity } : source}
+              className="w-full border-l-0"
+            />
           </div>
 
           <section>

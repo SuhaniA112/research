@@ -147,6 +147,16 @@ async def test_project_scores_use_project_text_query_and_saved() -> None:
 
 
 @pytest.mark.asyncio
+async def test_project_suggestions_exclude_saved_and_fall_back() -> None:
+    a, s = _paper("a"), _paper("s")
+    service, _, _ = _service([a, s], {a.id: [1, 0, 0], s.id: [1, 0, 0]}, saved=[s])
+    project = SimpleNamespace(id=uuid4(), name="Vision", description="", topics=[], keywords=[])
+    suggestions = await service.project_suggestions(project, limit=5)
+    assert [r.paper.id for r in suggestions] == [a.id]
+    assert suggestions[0].relevance is not None
+
+
+@pytest.mark.asyncio
 async def test_related_skips_the_paper_itself() -> None:
     a, b = _paper("a"), _paper("b")
     service, _, _ = _service([a, b], {a.id: [1, 0, 0], b.id: [0.9, 0.1, 0]})
