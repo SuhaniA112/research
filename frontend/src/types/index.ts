@@ -29,6 +29,8 @@ export interface Source {
   keyFindings: { text: string; section: string }[];
   /** Leveled AI summaries when available. */
   summaries?: SourceSummaries;
+  /** "extractive" = built from the abstract while the AI model is unavailable. */
+  summarySource?: "ai" | "extractive" | null;
   publicationUrl: string;
   externalId?: string;
   pdfUrl?: string | null;

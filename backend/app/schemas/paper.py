@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -41,6 +42,8 @@ class PaperResponse(BaseModel):
     summary_graduate: str | None = None
     summary_expert: str | None = None
     key_findings: list[KeyFinding] = Field(default_factory=list)
+    # "ai" (OpenRouter), "extractive" (abstract fallback, not persisted) or None.
+    summary_source: Literal["ai", "extractive"] | None = None
     created_at: datetime
 
     @field_validator("title", mode="before")

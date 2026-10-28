@@ -24,6 +24,7 @@ Edit `backend/.env`:
 
 - `VOYAGE_API_KEY` — faster discovery + embeddings on save
 - `OPENROUTER_API_KEY` — ask / generation
+  (optional: without it, or when free-tier limits hit, summaries fall back to the abstract and OpenRouter is paused for the `Retry-After` window)
 
 ### Frontend-only (mocks)
 

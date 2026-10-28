@@ -21,6 +21,7 @@ export interface BackendPaper {
   summary_graduate?: string | null;
   summary_expert?: string | null;
   key_findings?: { text: string; section?: string }[];
+  summary_source?: "ai" | "extractive" | null;
   created_at?: string;
 }
 
@@ -90,6 +91,7 @@ export function mapBackendPaperToSource(
         : null,
       expert: paper.summary_expert ? decodeHtmlEntities(paper.summary_expert) : null,
     },
+    summarySource: paper.summary_source ?? null,
     publicationUrl: paper.url ?? paper.pdf_url ?? "#",
     externalId: paper.external_id,
     pdfUrl: paper.pdf_url ?? null,

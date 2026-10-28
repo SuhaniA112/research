@@ -100,7 +100,11 @@ export function SourcePreviewCard({
             <p className="mt-2 text-sm text-gray-400">Generating summary…</p>
           ) : null}
 
-          {hasAiSummary ? (
+          {hasAiSummary && source.summarySource === "extractive" ? (
+            <span className="mt-3 flex items-center gap-1 text-xs text-gray-500">
+              Summary from abstract
+            </span>
+          ) : hasAiSummary ? (
             <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
               <Sparkles className="h-3.5 w-3.5" />
               AI Generated Description

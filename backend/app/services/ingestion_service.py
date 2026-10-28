@@ -14,6 +14,7 @@ from app.schemas.research_papers import IndPaper
 from app.schemas.stats import ProjectStatsResponse, SourceValidityResponse
 from app.services.embeddings.voyage_client import VoyageEmbeddingClient
 from app.services.indexing.paper_indexer import PaperIndexer
+from app.services.summarization.extractive import extractive_summary
 from app.services.summarization.paper_summarizer import PaperSummarizer
 from app.services.project_stats import compute_project_stats
 from app.services.source_validity import compute_source_validity
@@ -157,7 +158,7 @@ class IngestionService:
             )
         paper, _ = await self.paper_repo.upsert_from_ind_paper(paper_in)
         paper = await self.ensure_summaries(paper)
-        return PaperResponse.model_validate(paper)
+        return with_summary_fallback(paper)
 
     async def get_paper_with_summaries(self, paper_id: UUID) -> PaperResponse:
         paper = await self.paper_repo.get_by_id(paper_id)
@@ -167,7 +168,7 @@ class IngestionService:
                 detail=f"Paper {paper_id} not found",
             )
         paper = await self.ensure_summaries(paper)
-        return PaperResponse.model_validate(paper)
+        return with_summary_fallback(paper)
 
     async def ensure_summaries(self, paper: Paper) -> Paper:
         """Generate and persist leveled summaries when missing. Soft-fails."""
@@ -213,7 +214,7 @@ class IngestionService:
                 detail=f"Project {project_id} not found",
             )
         papers = await self.project_paper_repo.list_papers_for_project(project_id)
-        return [PaperResponse.model_validate(paper) for paper in papers]
+        return [with_summary_fallback(paper) for paper in papers]
 
     async def get_source_validity(
         self, project_id: UUID, user_id: UUID
@@ -253,3 +254,22 @@ class IngestionService:
             project.updated_at = datetime.now(timezone.utc)
             await self.project_repo.update(project)
         return deleted
+
+
+def with_summary_fallback(paper: Paper) -> PaperResponse:
+    """Response with AI summaries, or abstract-based ones when the LLM gave none."""
+    response = PaperResponse.model_validate(paper)
+    if response.summary_general and response.summary_graduate and response.summary_expert:
+        return response.model_copy(update={"summary_source": "ai"})
+    fallback = extractive_summary(response.abstract)
+    if fallback is None:
+        return response
+    return PaperResponse.model_validate(
+        {**response.model_dump(), **{
+            "summary_general": fallback["general"],
+            "summary_graduate": fallback["graduate"],
+            "summary_expert": fallback["expert"],
+            "key_findings": response.key_findings or fallback["key_findings"],
+            "summary_source": "extractive",
+        }}
+    )

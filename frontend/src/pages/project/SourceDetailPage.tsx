@@ -257,10 +257,16 @@ export function SourceDetailPage() {
               {summaryText || source.description || "No summary available yet."}
             </p>
             {source.summaries?.[summaryLevel]?.trim() ? (
-              <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI Generated Description
-              </span>
+              source.summarySource === "extractive" ? (
+                <span className="mt-3 flex items-center gap-1 text-xs text-gray-500">
+                  Summary from abstract
+                </span>
+              ) : (
+                <span className="mt-3 flex items-center gap-1 text-xs text-brand-600">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  AI Generated Description
+                </span>
+              )
             ) : null}
           </div>
 
