@@ -7,7 +7,9 @@ Requires a running API (uvicorn on :8000), Postgres, and non-empty:
 in backend/.env (loaded by the API process).
 
 Usage (from repo root, API already running):
-  backend/.venv/bin/python scripts/e2e_save_ask.py
+  npm run e2e
+  (or directly: backend/.venv/bin/python on macOS/Linux,
+   backend/.venv/Scripts/python.exe on Windows)
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ def load_dotenv(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.exists():
         return values
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

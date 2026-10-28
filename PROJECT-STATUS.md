@@ -26,7 +26,10 @@ FastAPI + async SQLAlchemy + Postgres (pgvector). Schema is applied with **Alemb
 
 - Saving triggers `PaperIndexer` (PDF → abstract → title fallback) + Voyage embeddings
 - `POST /projects/{id}/ask` — retrieval + OpenRouter answer with citations
-- Offline eval harness under `backend/eval/`
+- Offline eval harness under `backend/eval/`: golden set, ranking metrics
+  (precision/recall/F1/hit/nDCG@k, MRR, MAP), embedding diagnostics (anisotropy,
+  effective dimensionality, hubness, PCA, relevance separation + threshold sweep),
+  and an HTML report with charts (`npm run eval`, `eval:diagnostics`, `eval:report`)
 
 **Summaries / key findings**
 
@@ -52,12 +55,13 @@ React app talks to the API through `frontend/src/api/*` adapters.
 - `VITE_USE_MOCKS=false` → real projects, search, save/unsave, paper GET, client mind map
 - Soft-empty / `[X]%` for digest, summaries, related/citing, stats, profile `/me`
 - Search history is **localStorage**-backed (sidebar stays in sync on delete)
-- Root scripts: `npm run setup`, `npm run dev` (Postgres + API + Vite)
+- Root scripts: `npm run setup`, `npm run dev` (Postgres + API + Vite) — cross-platform
+  (macOS, Linux, Windows; see README "Windows notes")
 
 ## What needs to be done
 
 1. **API keys + E2E** — set real `VOYAGE_API_KEY` / `OPENROUTER_API_KEY` in `backend/.env`,
-   run API, then `backend/.venv/bin/python scripts/e2e_save_ask.py`
+   run API, then `npm run e2e`
    (ask is API-only for verification; **no Ask UI** — out of product scope)
 2. **Auth** — in progress on `auth-clerk-migration` (Clerk); login/session, `/users/me`,
    scope projects by `user_id`

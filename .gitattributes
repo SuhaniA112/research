@@ -1,0 +1,21 @@
+# Store text files with LF in the repo and let each OS check out its native
+# line endings. Without this, a Windows checkout (CRLF) looks fully modified
+# to WSL / Linux tools whose core.autocrlf differs.
+* text=auto
+
+# Scripts that must keep a specific line ending regardless of OS.
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary assets.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary

@@ -8,18 +8,25 @@
  */
 import { execSync } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const backend = join(root, "backend");
-const frontend = join(root, "frontend");
-const venvPython = join(backend, ".venv", "bin", "python");
-const alembic = join(backend, ".venv", "bin", "alembic");
+import {
+  backend,
+  findSystemPython,
+  frontend,
+  isWindows,
+  pythonEnv,
+  q,
+  root,
+  venvBin,
+  venvPython,
+} from "./platform.mjs";
 
-function run(cmd, cwd = root) {
+const alembic = venvBin("alembic");
+
+function run(cmd, cwd = root, env = process.env) {
   console.log(`\n> ${cmd}`);
-  execSync(cmd, { cwd, stdio: "inherit", env: process.env, shell: true });
+  execSync(cmd, { cwd, stdio: "inherit", env, shell: true });
 }
 
 function ensureCopied(from, to, label) {
@@ -31,7 +38,7 @@ function ensureCopied(from, to, label) {
   console.log(`✓ created ${label}`);
 }
 
-console.log("PaperSearcher setup\n");
+console.log(`PaperSearcher setup (${isWindows ? "Windows" : process.platform})\n`);
 
 ensureCopied(
   join(backend, ".env.example"),
@@ -57,10 +64,20 @@ run("npm install");
 run("npm install", frontend);
 
 if (!existsSync(venvPython)) {
-  run("python3 -m venv .venv", backend);
+  const systemPython = findSystemPython();
+  if (!systemPython) {
+    console.error(
+      isWindows
+        ? "\nPython 3.11+ not found. Install it from python.org (tick \"Add to PATH\"), " +
+            "or set PYTHON=<path to python.exe>, then re-run: npm run setup\n"
+        : "\nPython 3.11+ not found. Install it, or set PYTHON=<path>, then re-run: npm run setup\n",
+    );
+    process.exit(1);
+  }
+  run(`${systemPython} -m venv .venv`, backend);
 }
-run(`"${venvPython}" -m pip install -r requirements.txt`, backend);
-run(`"${alembic}" upgrade head`, backend);
+run(`${q(venvPython)} -m pip install -r requirements.txt`, backend, pythonEnv());
+run(`${q(alembic)} upgrade head`, backend, pythonEnv());
 
 console.log(`
 Setup complete.

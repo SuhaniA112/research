@@ -56,7 +56,7 @@ async def generate_question(paper: Paper) -> str:
 
 def load_golden_set() -> dict:
     if GOLDEN_SET_PATH.exists():
-        with GOLDEN_SET_PATH.open() as f:
+        with GOLDEN_SET_PATH.open(encoding="utf-8") as f:
             return json.load(f)
     return {
         "generated_at": None,
@@ -67,7 +67,7 @@ def load_golden_set() -> dict:
 
 
 def save_golden_set(data: dict) -> None:
-    with GOLDEN_SET_PATH.open("w") as f:
+    with GOLDEN_SET_PATH.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
 
