@@ -141,11 +141,14 @@ async function pickUser() {
 async function benchApi() {
   console.log(`\n== API latency (${runs} runs each) ==`);
   const userId = opt("user-id", null) ?? (await pickUser());
-  const interests = opt("interests", "machine learning,computer vision,natural language processing").split(",");
   const me = await call("GET", "/users/me", userId);
-  if (!me.research_areas.length) await call("PATCH", "/users/me", userId, { research_areas: interests });
   const projects = await call("GET", "/projects", userId);
-  const terms = (me.research_areas.length ? me.research_areas : interests).slice(0, 4);
+  // Same interests the hub uses: profile terms, then project topics/keywords. Never written back.
+  const terms = [...new Set([
+    ...me.research_areas, ...me.keywords,
+    ...projects.flatMap((p) => [...(p.topics ?? []), ...(p.keywords ?? [])]),
+  ])].slice(0, 4);
+  if (terms.length === 0) throw new Error("This user has no interests or project topics; add some on the Profile page.");
 
   // Old hub: profile + projects (twice, as the page did) + saved lists + one discovery search per interest.
   const oldHub = async () => {

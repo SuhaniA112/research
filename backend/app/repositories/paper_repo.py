@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -41,7 +42,7 @@ class PaperRepository(BaseRepository[Paper]):
         wanted = {t.casefold() for t in topics if t}
         if not wanted:
             return []
-        stmt = select(Paper).where(Paper.topics.overlap(list(topics))).limit(limit * 4)
+        stmt = select(Paper).where(Paper.topics.op("&&")(pg_array(list(topics)))).limit(limit * 4)
         result = await self.session.execute(stmt)
         scored = []
         for paper in result.scalars().all():

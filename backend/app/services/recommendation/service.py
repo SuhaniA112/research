@@ -24,6 +24,8 @@ POOL_PER_QUERY = 25
 MAX_RANKED = 50
 SPARSE_THRESHOLD = 10
 CANDIDATE_MAX_DISTANCE = 0.75
+# Second pass when nothing is that close: still recommend the nearest papers.
+RELAXED_MAX_DISTANCE = 2.0
 DIGEST_TTL_SECONDS = 60 * 60
 EMBED_CACHE_SIZE = 2048
 
@@ -167,14 +169,17 @@ class RecommendationService:
 
         candidate_ids: list[UUID] = []
         seen: set[UUID] = set()
-        for q in queries:
-            hits = await self.chunk_repo.search_global(
-                list(q), max_distance=CANDIDATE_MAX_DISTANCE, limit=POOL_PER_QUERY
-            )
-            for paper, _ in hits:
-                if paper.id not in exclude and paper.id not in seen:
-                    seen.add(paper.id)
-                    candidate_ids.append(paper.id)
+        for max_distance in (CANDIDATE_MAX_DISTANCE, RELAXED_MAX_DISTANCE):
+            for q in queries:
+                hits = await self.chunk_repo.search_global(
+                    list(q), max_distance=max_distance, limit=POOL_PER_QUERY
+                )
+                for paper, _ in hits:
+                    if paper.id not in exclude and paper.id not in seen:
+                        seen.add(paper.id)
+                        candidate_ids.append(paper.id)
+            if candidate_ids:
+                break
 
         vectors = await self._paper_vectors(candidate_ids)
         ids = [pid for pid in candidate_ids if pid in vectors]
