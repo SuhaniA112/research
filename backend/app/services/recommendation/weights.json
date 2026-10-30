@@ -1,0 +1,18 @@
+{
+  "weights": {
+    "search": 0.5,
+    "semantic": 0.0,
+    "saved": 0.2,
+    "recency": 0.1,
+    "citations": 0.1,
+    "topic": 0.1
+  },
+  "tuned_at": "2026-10-30T00:03:29.040256+00:00",
+  "project_id": "8220b56d-edf4-4949-a55a-6e6b435ca63d",
+  "n_queries": 19,
+  "loo_cv": {
+    "ndcg@10": 1.0,
+    "mrr": 1.0,
+    "recall@10": 1.0
+  }
+}
